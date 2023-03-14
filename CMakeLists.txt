@@ -1,0 +1,16 @@
+
+cmake_minimum_required(VERSION 3.25)
+
+project(LearnFFmpeg VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+
+set(FFMPEG_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/FFmpeg60")
+set(FFMPEG_INCLUDE_DIR "${FFMPEG_BASE_DIR}/include") 
+set(FFMPEG_LIB_DIR "${FFMPEG_BASE_DIR}/lib")
+set(FFMPEG_BIN_DIR "${FFMPEG_BASE_DIR}/bin")
+
+message("CMAKE_CURRENT_SOURCE_DIR == " ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(simplest_ffmpeg_player)
