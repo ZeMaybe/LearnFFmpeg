@@ -65,8 +65,8 @@ int main(int argc, char* argv[])
     int ret, got_picture;
     struct SwsContext* img_convert_ctx;
 
-    //char filepath[]="Titanic.mkv";
-    char filepath[] = "D:/Work/Learn/FFmpeg/videos/FFMPEG/bbb_sunflower_1080p_60fps_normal.mp4";
+    // change this to your file location.
+    char filepath[] = "1.mp4";
 
     FILE* fp_yuv = fopen("output.yuv", "wb+");
 

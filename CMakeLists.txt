@@ -13,4 +13,15 @@ set(FFMPEG_BIN_DIR "${FFMPEG_BASE_DIR}/bin")
 
 message("CMAKE_CURRENT_SOURCE_DIR == " ${CMAKE_CURRENT_SOURCE_DIR})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 add_subdirectory(simplest_ffmpeg_player)
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+file(COPY_FILE "${FFMPEG_BIN_DIR}/avcodec-60.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avcodec-60.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/avdevice-60.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avdevice-60.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/avfilter-9.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avfilter-9.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/avformat-60.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avformat-60.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/avutil-58.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avutil-58.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/postproc-57.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/postproc-57.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/swresample-4.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/swresample-4.dll" ONLY_IF_DIFFERENT)
+file(COPY_FILE "${FFMPEG_BIN_DIR}/swscale-7.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/swscale-7.dll" ONLY_IF_DIFFERENT)
