@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 {
     char* input_path = get_input_file_path(argc, argv);
     AVFormatContext* fmt_ctx = nullptr;
-    int ret = avformat_open_input(&fmt_ctx, input_path, NULL, NULL);
+    int ret = avformat_open_input(&fmt_ctx, input_path, nullptr, nullptr);
     if (ret < 0)
     {
         std::cout << "Can't open input file:" << input_path << std::endl;
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
         return ret;
     }
 
-    ret = avcodec_open2(video_codec_ctx, video_codec, NULL);
+    ret = avcodec_open2(video_codec_ctx, video_codec, nullptr);
     if (ret < 0)
     {
         std::cout << "Can't open video decoder.\n";
@@ -127,9 +127,7 @@ int main(int argc, char* argv[])
     unsigned char* yuv_buffer = (unsigned char*)av_malloc(av_image_get_buffer_size(AV_PIX_FMT_YUV420P, video_codec_ctx->width, video_codec_ctx->height, 1));
     av_image_fill_arrays(yuv_frame->data, yuv_frame->linesize, yuv_buffer, AV_PIX_FMT_YUV420P, video_codec_ctx->width, video_codec_ctx->height, 1);
 
-    //SwsContext* sws_ctx = sws_getContext(video_codec_ctx->width, video_codec_ctx->height, video_codec_ctx->pix_fmt, video_codec_ctx->width, video_codec_ctx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, nullptr, nullptr, nullptr);
-
-    SwsContext* sws_ctx = sws_getContext(video_codec_ctx->width, video_codec_ctx->height, video_codec_ctx->pix_fmt, video_codec_ctx->width, video_codec_ctx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, NULL, NULL, NULL);
+    SwsContext* sws_ctx = sws_getContext(video_codec_ctx->width, video_codec_ctx->height, video_codec_ctx->pix_fmt, video_codec_ctx->width, video_codec_ctx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, nullptr, nullptr, nullptr);
 
 
     AVPacket* packet = av_packet_alloc();
@@ -180,9 +178,9 @@ int main(int argc, char* argv[])
             sws_scale(sws_ctx, frame->data, frame->linesize, 0, video_codec_ctx->height, yuv_frame->data, yuv_frame->linesize);
             len = video_codec_ctx->width * video_codec_ctx->height;
 
-            fwrite(frame->data[0], 1, len, output_file);
-            fwrite(frame->data[1], 1, len / 4, output_file);
-            fwrite(frame->data[2], 1, len / 4, output_file);
+            fwrite(yuv_frame->data[0], 1, len, output_file);
+            fwrite(yuv_frame->data[1], 1, len / 4, output_file);
+            fwrite(yuv_frame->data[2], 1, len / 4, output_file);
 
             fflush(output_file);
             std::cout << "Success to decode frame: " << ++count << std::endl;
