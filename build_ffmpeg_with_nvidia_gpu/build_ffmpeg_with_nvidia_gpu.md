@@ -34,9 +34,9 @@ now your **nv_sdk** folder looks like this:![nv sdk](./images/nv_sdk.png)
     pacman -S diffutils make pkg-config yasm
 ```
 
-NOTE:Almost all the commans are running in MinGW64 environment from now on.![mingw64](./images/mingw64.png)
+NOTE:Almost all the commands are running in MinGW64 environment from now on.![mingw64](./images/mingw64.png)
 
--Add the following paths by running the commands.
+- Add the following paths by running the commands.
 
 ```-git
 export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.35.32215/bin/Hostx64/x64/":$PATH
