@@ -1,3 +1,12 @@
+# WARNING WARNING WARNING WARNING 
+
+You need to replace the **absolute path** show in this article according to the installation path of your **VS2022**, **CUDA toolkits**,**msys2** and the **Working directory**.
+
+**IF YOU JUSE COPY ALL THE PATH I USED HERE,YOU ARE DOOMED TO FAIL.**
+
+[ORIGINAL FFMPEG-WITH-NVIDIA-GPU](https://docs.nvidia.com/video-codec-sdk/11.0/ffmpeg-with-nvidia-gpu/index.html)
+
+
 # Compiling for window
 
 - install [Microsoft Visual Studio 2022 community version](https://visualstudio.microsoft.com/downloads/).
@@ -7,13 +16,13 @@
 - create an empty folder as your <span style="color:orange">**working directory**</span>. **eg:"D:/ffmpeg"**.
 - clone ffnvcodec to <span style="color:orange">**working directory**</span>
 
-```-git
+```
 git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
 ```
 
 - clone FFmpeg to <span style="color:orange">**working directory**</span>.
   
-```-git
+```
 git clone https://git.ffmpeg.org/ffmpeg.git
 ```
 
@@ -30,7 +39,7 @@ now your **nv_sdk** folder looks like this:![nv sdk](./images/nv_sdk.png)
 - From the Visual Studio x64 Native Tools Command Prompt, launch the MinGW64 environment by running mingw64.exe from the msys2 installation folder.![launch mingw64](./images/launch_mingw64.png)
 - In the MinGW64 environment, install the necessary packages.
 
-```-git
+```
     pacman -S diffutils make pkg-config yasm
 ```
 
@@ -38,7 +47,7 @@ NOTE:Almost all the commands are running in MinGW64 environment from now on.![mi
 
 - Add the following paths by running the commands.
 
-```-git
+```
 export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.35.32215/bin/Hostx64/x64/":$PATH
 
 export PATH="/d/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/bin/":$PATH
@@ -46,13 +55,13 @@ export PATH="/d/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/bin/":$PAT
 
 - Goto nv-codec-headers directory and install ffnvcodec
 
-```-git
+```
 make install PREFIX=/usr
 ```
 
 - Go to the FFmpeg installation folder and run the following command.
 
-```-git
+```
 ./configure --enable-nonfree --enable-shared --enable-cuda --enable-cuvid --enable-ffnvcodec --enable-nvdec --enable-nvenc --enable-libnpp --toolchain=msvc --extra-cflags=-I../nv_sdk --extra-ldflags=-libpath:../nv_sdk
 ```
 
