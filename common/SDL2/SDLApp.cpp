@@ -29,6 +29,11 @@ SDLApp::SDLApp(Uint32 sdlFlags)
 
 int SDLApp::exec()
 {
+    if (wnds.size() == 0)
+    {
+        running = false;
+    }
+
     SDL_Event Event;
     while (running)
     {
@@ -121,145 +126,138 @@ void SDLApp::dispatchDisplayEvent(const SDL_DisplayEvent& ev)
 
 void SDLApp::dispatchWindowEvent(const SDL_WindowEvent& ev)
 {
-    SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-    if (wnd == nullptr)        return;
+    if (ev.windowID == 0)
+    {
+        SDL_Log("Widnow Event with an invalid windowID 0");
+        return;
+    }
 
     switch (ev.event)
     {
-    case SDL_WINDOWEVENT_SHOWN:        onWindowShown(wnd);  break;
-    case SDL_WINDOWEVENT_HIDDEN:       onWindowHidden(wnd); break;
-    case SDL_WINDOWEVENT_EXPOSED:      onWindowExposed(wnd);    break;
-    case SDL_WINDOWEVENT_MOVED:        onWindowMoved(wnd, ev.data1, ev.data2);       break;
-    case SDL_WINDOWEVENT_RESIZED:      onWindowResized(wnd, ev.data1, ev.data2);     break;
-    case SDL_WINDOWEVENT_SIZE_CHANGED: onWindowSizeChanged(wnd, ev.data1, ev.data2); break;
-    case SDL_WINDOWEVENT_MINIMIZED:    onWindowMinimized(wnd);       break;
-    case SDL_WINDOWEVENT_MAXIMIZED:    onWindowMaximized(wnd);       break;
-    case SDL_WINDOWEVENT_RESTORED:     onWindowRestored(wnd);    break;
-    case SDL_WINDOWEVENT_ENTER:        onWindowMouseEnter(wnd);  break;
-    case SDL_WINDOWEVENT_LEAVE:        onWindowMouseLeave(wnd);  break;
-    case SDL_WINDOWEVENT_FOCUS_GAINED: onWindowKeyboardFocusGained(wnd); break;
-    case SDL_WINDOWEVENT_FOCUS_LOST:   onWindowKeyboardFocusLost(wnd);   break;
-    case SDL_WINDOWEVENT_CLOSE:        onWindowClose(wnd); break;
+    case SDL_WINDOWEVENT_SHOWN:        getWnd(ev.windowID)->onShown();      break;
+    case SDL_WINDOWEVENT_HIDDEN:       getWnd(ev.windowID)->onHidden();     break;
+    case SDL_WINDOWEVENT_EXPOSED:      getWnd(ev.windowID)->onExposed();    break;
+    case SDL_WINDOWEVENT_MOVED:        getWnd(ev.windowID)->onMoved(ev.data1, ev.data2);       break;
+    case SDL_WINDOWEVENT_RESIZED:      getWnd(ev.windowID)->onResized(ev.data1, ev.data2);     break;
+    case SDL_WINDOWEVENT_SIZE_CHANGED: getWnd(ev.windowID)->onSizeChanged(ev.data1, ev.data2); break;
+    case SDL_WINDOWEVENT_MINIMIZED:    getWnd(ev.windowID)->onMinimized();           break;
+    case SDL_WINDOWEVENT_MAXIMIZED:    getWnd(ev.windowID)->onMaximized();           break;
+    case SDL_WINDOWEVENT_RESTORED:     getWnd(ev.windowID)->onRestored();            break;
+    case SDL_WINDOWEVENT_ENTER:        getWnd(ev.windowID)->onMouseEnter();          break;
+    case SDL_WINDOWEVENT_LEAVE:        getWnd(ev.windowID)->onMouseLeave();          break;
+    case SDL_WINDOWEVENT_FOCUS_GAINED: getWnd(ev.windowID)->onKeyboardFocusGained(); break;
+    case SDL_WINDOWEVENT_FOCUS_LOST:   getWnd(ev.windowID)->onKeyboardFocusLost();   break;
+    case SDL_WINDOWEVENT_CLOSE:        getWnd(ev.windowID)->onClose();               break;
 #if SDL_VERSION_ATLEAST(2,0,5)
-    case SDL_WINDOWEVENT_TAKE_FOCUS:   onWindowTakeFocus(wnd); break;
-    case SDL_WINDOWEVENT_HIT_TEST:     onWindowHitTest(wnd);   break;
+    case SDL_WINDOWEVENT_TAKE_FOCUS:   getWnd(ev.windowID)->onTakeFocus();           break;
+    case SDL_WINDOWEVENT_HIT_TEST:     getWnd(ev.windowID)->onHitTest();             break;
 #endif
 
 #if SDL_VERSION_ATLEAST(2,0,18)
-    case SDL_WINDOWEVENT_ICCPROF_CHANGED: onWindowIccprofChanged(wnd); break;
-    case SDL_WINDOWEVENT_DISPLAY_CHANGED: onWindowDisplayChanged(wnd, ev.data1); break;
+    case SDL_WINDOWEVENT_ICCPROF_CHANGED: getWnd(ev.windowID)->onIccprofChanged();   break;
+    case SDL_WINDOWEVENT_DISPLAY_CHANGED: getWnd(ev.windowID)->onDisplayChanged(ev.data1);break;
 #endif
-    default: SDL_Log("Unhandled SDL_WINDOWEVENT for window : %d", ev.windowID); break;
+    default: SDL_Log("Unhandled SDL_WINDOWEVENT for window : %d", ev.windowID);       break;
     }
 }
 
 void SDLApp::dispatchKeyDownEvent(const SDL_KeyboardEvent& ev)
 {
-    if (onKeyDown(ev.keysym, ev.repeat) == false)
+    if (onKeyDown(ev.keysym, ev.repeat) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowKeyDown(wnd, ev.keysym, ev.repeat);
-        }
+        getWnd(ev.windowID)->onKeyDown(ev.keysym, ev.repeat);
     }
 }
 
 void SDLApp::dispatchKeyUpEvent(const SDL_KeyboardEvent& ev)
 {
-    if (onKeyUp(ev.keysym, ev.repeat) == false)
+    if (onKeyUp(ev.keysym, ev.repeat) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowKeyUp(wnd, ev.keysym, ev.repeat);
-        }
+        getWnd(ev.windowID)->onKeyUp(ev.keysym, ev.repeat);
     }
 }
 
 void SDLApp::dispatchTextEditingEvent(const SDL_TextEditingEvent& ev)
 {
-    if (onTextEditing(ev.text, ev.start, ev.length) == false)
+    if (onTextEditing(ev.text, ev.start, ev.length) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowTextEditing(wnd, ev.text, ev.start, ev.length);
-        }
+        getWnd(ev.windowID)->onTextEditing(ev.text, ev.start, ev.length);
     }
 }
 
 void SDLApp::dispatchTextInputEvent(const SDL_TextInputEvent& ev)
 {
-    if (onTextInput(ev.text) == false)
+    if (onTextInput(ev.text) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowTextInput(wnd, ev.text);
-        }
+        getWnd(ev.windowID)->onTextInput(ev.text);
     }
 }
 
 //https://wiki.libsdl.org/SDL2/SDL_MouseMotionEvent
 void SDLApp::dispatchMouseMotionEvent(const SDL_MouseMotionEvent& ev)
 {
-    if (onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel) == false)
+    if (onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowMouseMove(wnd, ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel);
-        }
+        getWnd(ev.windowID)->onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel);
     }
 }
 
 void SDLApp::dispatchMouseButtonDownEvent(const SDL_MouseButtonEvent& ev)
 {
-    if (onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false)
+    if (onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowMouseButtonDown(wnd, ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
-        }
+        getWnd(ev.windowID)->onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
     }
 }
 
 void SDLApp::dispatchMouseButtonUpEvent(const SDL_MouseButtonEvent& ev)
 {
-    if (onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false)
+    if (onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowMouseButtonUp(wnd, ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
-        }
+        getWnd(ev.windowID)->onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
     }
 }
 
 void SDLApp::dispatchMouseWheelEvent(const SDL_MouseWheelEvent& ev)
 {
-    if (onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY) == false)
+    if (onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowMouseWheel(wnd, ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY);
-        }
+        getWnd(ev.windowID)->onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY);
     }
 }
 
 void SDLApp::dispatchUserEvent(const SDL_UserEvent& ev)
 {
-    if (onUserEvent(ev.code, ev.data1, ev.data2) == false)
+    if (onUserEvent(ev.code, ev.data1, ev.data2) == false && ev.windowID != 0)
     {
-        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
-        if (wnd != nullptr)
-        {
-            onWindowUserEvent(wnd, ev.code, ev.data1, ev.data2);
-        }
+        getWnd(ev.windowID)->onUserEvent(ev.code, ev.data1, ev.data2);
     }
+}
+
+void SDLApp::onQuit()
+{
+    running = false;
+}
+
+SDLWindow* SDLApp::getWnd(Uint32 wndId)
+{
+    // an simple speedup to avoid some std::map::find() calling..
+    if (lastActiveWnd && lastActiveWnd->getWndId() == wndId)
+    {
+        return lastActiveWnd;
+    }
+
+    auto it = wnds.find(wndId);
+    if (it != wnds.end())
+    {
+        lastActiveWnd = it->second;
+    }
+    else
+    {
+        SDL_Window* tmpWnd = SDL_GetWindowFromID(wndId);
+        lastActiveWnd = new SDLWindow(tmpWnd);            // if tmpWnd is nullptr,application will stop.
+    }
+    return lastActiveWnd;
 }
 
 bool SDLApp::insertWindow(SDLWindow* wnd)
@@ -267,11 +265,26 @@ bool SDLApp::insertWindow(SDLWindow* wnd)
     bool re = false;
     if (wnd != nullptr)
     {
-        if(wnds.count(wnd->getWndId()) == 0)
+        auto it = wnds.find(wnd->getWndId());
+        if (it == wnds.end())
         {
-           re = (wnds.insert(std::pair{ wnd->getWndId(), wnd })).second;
+            re = wnds.insert(std::pair{ wnd->getWndId(),wnd }).second;
         }
     }
     return re;
+}
+
+void SDLApp::removeWindow(SDLWindow* wnd)
+{
+    if (wnd != nullptr)
+    {
+        wnds.erase(wnd->getWndId());
+    }
+
+    // if now window is alive,the appliction is going to quite.
+    if (wnds.size() == 0)
+    {
+        running = false;
+    }
 }
 
