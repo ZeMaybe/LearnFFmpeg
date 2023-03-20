@@ -2,7 +2,7 @@
 
 You need to replace the **absolute path** show in this article according to the installation path of your **VS2022**, **CUDA toolkits**,**msys2** and the **Working directory**.
 
-**IF YOU JUSE COPY ALL THE PATH I USED HERE,YOU ARE DOOMED TO FAIL.**
+**IF YOU JUST COPY ALL THE PATH I USED HERE,YOU ARE DOOMED TO FAIL.**
 
 [ORIGINAL FFMPEG-WITH-NVIDIA-GPU](https://docs.nvidia.com/video-codec-sdk/11.0/ffmpeg-with-nvidia-gpu/index.html)
 
