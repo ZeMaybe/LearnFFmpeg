@@ -1,16 +1,30 @@
 ﻿
 #include "SDLApp.h"
 #include <iostream>
+#include "SDLWindow.h"
+
+SDLApp* SDLApp::theApp = nullptr;
+
+SDLApp* SDLApp::get()
+{
+    SDL_assert(theApp != nullptr);
+    return theApp;
+}
 
 SDLApp::SDLApp(Uint32 sdlFlags)
 {
+    if (theApp != nullptr)
+    {
+        SDL_Log("Only one SDLApp instance is allowed.");
+        SDL_assert(false);
+    }
+    theApp = this;
+
     running = init(sdlFlags);
     if (running == false)
     {
         std::cout << "SDL2 init failed! exec() will does nothing!";
     }
-
-    wnd = SDL_CreateWindow("test wnd", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 680, 420, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 }
 
 int SDLApp::exec()
@@ -27,6 +41,7 @@ int SDLApp::exec()
         render();
     }
     clean();
+
     return 0;
 }
 
@@ -75,12 +90,22 @@ void SDLApp::dispatchEvent(SDL_Event* ev)
     case SDL_CONTROLLERDEVICEREMAPPED:
         SDL_Log("Joy and Controller event not handled!");
         break;
-    case SDL_AUDIODEVICEADDED:
-    case SDL_AUDIODEVICEREMOVED:
-        break;
-
-    default:
-        break;
+    case SDL_AUDIODEVICEADDED:        onAudioDeviceAdded(ev->adevice.which, ev->adevice.iscapture);   break;
+    case SDL_AUDIODEVICEREMOVED:      onAudioDeviceRemoved(ev->adevice.which, ev->adevice.iscapture); break;
+    case SDL_QUIT:                    onQuit(); break;
+    case SDL_USEREVENT:               dispatchUserEvent(ev->user); break;
+    case SDL_SYSWMEVENT:              SDL_Log("SystemWmEvent not handled!"); break;
+    case SDL_FINGERMOTION:
+    case SDL_FINGERDOWN:
+    case SDL_FINGERUP:
+    case SDL_MULTIGESTURE:
+    case SDL_DOLLARGESTURE:
+    case SDL_DOLLARRECORD:            SDL_Log("Finger and Gesture event not handled!");  break;
+    case SDL_DROPBEGIN:
+    case SDL_DROPCOMPLETE:
+    case SDL_DROPFILE:
+    case SDL_DROPTEXT:                SDL_Log("Drop event not handled!");       break;
+    default:                          SDL_Log("Unknown event : %d!", ev->type);  break;
     }
 }
 
@@ -225,4 +250,28 @@ void SDLApp::dispatchMouseWheelEvent(const SDL_MouseWheelEvent& ev)
     }
 }
 
+void SDLApp::dispatchUserEvent(const SDL_UserEvent& ev)
+{
+    if (onUserEvent(ev.code, ev.data1, ev.data2) == false)
+    {
+        SDL_Window* wnd = SDL_GetWindowFromID(ev.windowID);
+        if (wnd != nullptr)
+        {
+            onWindowUserEvent(wnd, ev.code, ev.data1, ev.data2);
+        }
+    }
+}
+
+bool SDLApp::insertWindow(SDLWindow* wnd)
+{
+    bool re = false;
+    if (wnd != nullptr)
+    {
+        if(wnds.count(wnd->getWndId()) == 0)
+        {
+           re = (wnds.insert(std::pair{ wnd->getWndId(), wnd })).second;
+        }
+    }
+    return re;
+}
 
