@@ -43,7 +43,9 @@
  * SDL_RenderPresent(): Show.
  */
 
-#include <stdio.h>
+
+#include <iostream>
+#include "SDLApp.h"
 
 extern "C"
 {
@@ -52,8 +54,8 @@ extern "C"
 
 const int bpp=12;
 
-int screen_w=500,screen_h=500;
-const int pixel_w=480,pixel_h=272;
+int screen_w=600,screen_h=380;
+const int pixel_w=1920,pixel_h=1080;
 
 unsigned char buffer[pixel_w*pixel_h*bpp/8];
 
@@ -85,9 +87,12 @@ int refresh_video(void *opaque){
 int main(int argc, char* argv[])
 {
 	if(SDL_Init(SDL_INIT_VIDEO)) {  
-		printf( "Could not initialize SDL - %s\n", SDL_GetError()); 
+		std::cout << "Could not initialize SDL " << SDL_GetError() << std::endl;
 		return -1;
 	} 
+
+	//SDLApp app(SDL_INIT_EVERYTHING);
+	//app.exec();
 
 	SDL_Window *screen; 
 	//SDL 2.0 Support for multiple windows
@@ -97,7 +102,8 @@ int main(int argc, char* argv[])
 		printf("SDL: could not create window - exiting:%s\n",SDL_GetError());  
 		return -1;
 	}
-	SDL_Renderer* sdlRenderer = SDL_CreateRenderer(screen, -1, 0);  
+	//SDL_Renderer* sdlRenderer = SDL_CreateRenderer(screen, -1, 0);  
+	SDL_Renderer* sdlRenderer = SDL_CreateRenderer(screen,-1, SDL_RENDERER_ACCELERATED);
 
 	Uint32 pixformat=0;
 
