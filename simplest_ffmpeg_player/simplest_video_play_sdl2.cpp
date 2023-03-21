@@ -66,11 +66,15 @@ public:
 
     virtual ~SimpleWindow()
     {
-        if (inputFile)
-            fclose(inputFile);
-        if (pixelBuff)
-            delete[] pixelBuff;
-        subThreadRunning = false;
+        {
+            std::lock_guard g(buffMutex);
+            buffFlag = true;
+            subThreadRunning = false;
+            if (inputFile)
+                fclose(inputFile);
+            if (pixelBuff)
+                delete[] pixelBuff;
+        }
 
         int tmp;
         SDL_WaitThread(subThread, &tmp);
@@ -85,14 +89,14 @@ public:
             std::lock_guard g(simpleWnd->buffMutex);
             if (simpleWnd->buffFlag == false)
             {
-                SDL_Log("before read:%lld", sdlApp->getRunningTime());
+                //SDL_Log("before read:%lld", sdlApp->getRunningTime());
                 if (fread(simpleWnd->pixelBuff, 1, simpleWnd->buffLen, simpleWnd->inputFile) != simpleWnd->buffLen)
                 {
                     fseek(simpleWnd->inputFile, 0, SEEK_SET);
                     fread(simpleWnd->pixelBuff, 1, simpleWnd->buffLen, simpleWnd->inputFile);
                 }
                 simpleWnd->buffFlag = true;
-                SDL_Log("after  read:%lld", sdlApp->getRunningTime());
+                //SDL_Log("after  read:%lld", sdlApp->getRunningTime());
             }
             if (simpleWnd->subThreadRunning == false)
                 break;
@@ -102,7 +106,7 @@ public:
 
     virtual void onTick()override
     {
-        if(sdlApp->getRunningTime() - t >= 16)
+        if (sdlApp->getRunningTime() - t >= 16)
         {
             std::lock_guard g(buffMutex);
             if (buffFlag == true)
@@ -110,7 +114,7 @@ public:
                 SDL_UpdateTexture(texture, nullptr, pixelBuff, pixelWidth);
                 t = sdlApp->getRunningTime();
                 buffFlag = false;
-                SDL_Log("          t:%lld", t);
+                //SDL_Log("          t:%lld", t);
             }
         }
     }
@@ -134,6 +138,7 @@ protected:
 int main(int argc, char* argv[])
 {
     SDLApp app(SDL_INIT_EVERYTHING);
-    SimpleWindow* wnd = new SimpleWindow("output.yuv", 800, 600);
+    SimpleWindow* wnd = new SimpleWindow("output.yuv", 800.0 * 1920.0 / 1080.0, 800);
+    //SimpleWindow* wnd1 = new SimpleWindow("output.yuv", 800.0 * 1920.0 / 1080.0, 800);
     return app.exec();
 }
