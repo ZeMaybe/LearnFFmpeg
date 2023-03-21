@@ -28,7 +28,7 @@ public:
 
 protected:
     friend class SDLApp;
-    virtual void onLoop();
+    virtual void onTick();
     virtual void onRender();
 
     virtual void onShown() {}

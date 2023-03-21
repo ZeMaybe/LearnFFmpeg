@@ -83,7 +83,7 @@ void SDLWindow::setTexture(SDL_Texture* t)
     texture = t;
 }
 
-void SDLWindow::onLoop()
+void SDLWindow::onTick()
 {
 }
 

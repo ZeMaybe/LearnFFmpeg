@@ -45,12 +45,13 @@
 
 #include "SDLApp.h"
 #include "SDLWindow.h"
+#include <mutex>
 
 class SimpleWindow :public SDLWindow
 {
 public:
-    SimpleWindow(const char* path,int w, int h)
-        :SDLWindow("simple window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE) 
+    SimpleWindow(const char* path, int w, int h)
+        :SDLWindow("simple window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE)
     {
         createTexture(SDL_PIXELFORMAT_IYUV, pixelWidth, pixelHeight);
 
@@ -58,6 +59,9 @@ public:
         SDL_assert(inputFile != nullptr);
         buffLen = pixelWidth * pixelHeight * bpp / 8;
         pixelBuff = new unsigned char[buffLen];
+
+        t = sdlApp->getRunningTime();
+        subThread = SDL_CreateThread(SimpleWindow::subThread_func, nullptr, this);
     }
 
     virtual ~SimpleWindow()
@@ -66,17 +70,49 @@ public:
             fclose(inputFile);
         if (pixelBuff)
             delete[] pixelBuff;
+        subThreadRunning = false;
+
+        int tmp;
+        SDL_WaitThread(subThread, &tmp);
     }
 
-    virtual void onLoop()override
+    static int subThread_func(void* data)
     {
-        if (fread(pixelBuff, 1, buffLen, inputFile) != buffLen)
-        {
-            fseek(inputFile, 0, SEEK_SET);
-            fread(pixelBuff, 1, buffLen,inputFile);
-        }
+        SimpleWindow* simpleWnd = (SimpleWindow*)data;
 
-        SDL_UpdateTexture(texture, nullptr, pixelBuff, pixelWidth);
+        while (true)
+        {
+            std::lock_guard g(simpleWnd->buffMutex);
+            if (simpleWnd->buffFlag == false)
+            {
+                SDL_Log("before read:%lld", sdlApp->getRunningTime());
+                if (fread(simpleWnd->pixelBuff, 1, simpleWnd->buffLen, simpleWnd->inputFile) != simpleWnd->buffLen)
+                {
+                    fseek(simpleWnd->inputFile, 0, SEEK_SET);
+                    fread(simpleWnd->pixelBuff, 1, simpleWnd->buffLen, simpleWnd->inputFile);
+                }
+                simpleWnd->buffFlag = true;
+                SDL_Log("after  read:%lld", sdlApp->getRunningTime());
+            }
+            if (simpleWnd->subThreadRunning == false)
+                break;
+        }
+        return 0;
+    }
+
+    virtual void onTick()override
+    {
+        if(sdlApp->getRunningTime() - t >= 16)
+        {
+            std::lock_guard g(buffMutex);
+            if (buffFlag == true)
+            {
+                SDL_UpdateTexture(texture, nullptr, pixelBuff, pixelWidth);
+                t = sdlApp->getRunningTime();
+                buffFlag = false;
+                SDL_Log("          t:%lld", t);
+            }
+        }
     }
 
 protected:
@@ -87,6 +123,12 @@ protected:
     const int bpp = 12;                   // bits per pixel ?
     int buffLen = 0;
     unsigned char* pixelBuff = nullptr;
+    std::atomic<bool> buffFlag = false;
+    bool subThreadRunning = true;
+    SDL_Thread* subThread = nullptr;
+    std::mutex buffMutex;
+
+    long long t = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 };
 
 int main(int argc, char* argv[])

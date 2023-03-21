@@ -11,6 +11,11 @@ SDLApp* SDLApp::get()
     return theApp;
 }
 
+long long SDLApp::getRunningTime() const
+{
+    return (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - t)).count();
+}
+
 SDLApp::SDLApp(Uint32 sdlFlags)
 {
     if (theApp != nullptr)
@@ -29,6 +34,7 @@ SDLApp::SDLApp(Uint32 sdlFlags)
 
 int SDLApp::exec()
 {
+    t = std::chrono::system_clock::now();
     if (wnds.size() == 0)
     {
         running = false;
@@ -42,7 +48,7 @@ int SDLApp::exec()
             dispatchEvent(&Event);
         }
 
-        loop();
+        tick();
         render();
     }
     clean();
@@ -60,12 +66,12 @@ bool SDLApp::init(Uint32 flags)
     return true;
 }
 
-void SDLApp::loop()
+void SDLApp::tick()
 {
     auto it = wnds.begin();
     while (it != wnds.end())
     {
-        it->second->onLoop();
+        it->second->onTick();
         ++it;
     }
 }

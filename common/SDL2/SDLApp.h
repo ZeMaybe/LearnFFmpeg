@@ -7,6 +7,7 @@ extern "C"
 }
 
 #include <map>
+#include <chrono>
 
 #define sdlApp (SDLApp::get())
 
@@ -17,11 +18,12 @@ public:
     SDLApp(Uint32 sdlFlags);
     int exec();
     static SDLApp* get();
+    long long getRunningTime()const;
 
 protected:
     // overide these functions in your subclass
     virtual bool init(Uint32 initFlags);
-    virtual void loop();
+    virtual void tick();
     virtual void render();
     virtual void clean();
 
@@ -79,6 +81,7 @@ protected:
     std::map<Uint32, SDLWindow*> wnds;
 
     SDLWindow* lastActiveWnd = nullptr;
+    std::chrono::system_clock::time_point t = std::chrono::system_clock::now();
 protected:
     bool insertWindow(SDLWindow* wnd);
     void removeWindow(SDLWindow* wnd);
