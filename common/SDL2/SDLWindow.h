@@ -19,8 +19,18 @@ public:
     bool getDestroyOnClose() const { return destroyOnClose; }
     void setDestroyOnClose(bool destroy) { destroyOnClose = destroy; }
 
+    bool createRenderer(Uint32 flags = SDL_RENDERER_ACCELERATED);
+    bool createTexture(Uint32 format,int access = SDL_TEXTUREACCESS_STREAMING);
+    bool createTexture(Uint32 format,int w,int h, int access = SDL_TEXTUREACCESS_STREAMING);
+
+    void setRenderer(SDL_Renderer* r);
+    void setTexture(SDL_Texture* t);
+
 protected:
     friend class SDLApp;
+    virtual void onLoop();
+    virtual void onRender();
+
     virtual void onShown() {}
     virtual void onHidden() {}
     virtual void onExposed() {}
@@ -50,7 +60,10 @@ protected:
     virtual void onUserEvent(Sint32 code, void* data1, void* data2) {}
 
 protected:
-    SDL_Window* wnd = nullptr;
     Uint32 wndId = 0;
+    SDL_Window* wnd = nullptr;
+    SDL_Renderer* renderer = nullptr;
+    SDL_Texture* texture = nullptr;
+
     bool destroyOnClose = true;
 };

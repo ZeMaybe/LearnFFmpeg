@@ -21,8 +21,8 @@ public:
 protected:
     // overide these functions in your subclass
     virtual bool init(Uint32 initFlags);
-    virtual void loop() {};
-    virtual void render() {};
+    virtual void loop();
+    virtual void render();
     virtual void clean();
 
 protected:

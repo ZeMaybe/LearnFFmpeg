@@ -60,6 +60,26 @@ bool SDLApp::init(Uint32 flags)
     return true;
 }
 
+void SDLApp::loop()
+{
+    auto it = wnds.begin();
+    while (it != wnds.end())
+    {
+        it->second->onLoop();
+        ++it;
+    }
+}
+
+void SDLApp::render()
+{
+    auto it = wnds.begin();
+    while (it != wnds.end())
+    {
+        it->second->onRender();
+        ++it;
+    }
+}
+
 void SDLApp::clean()
 {
     running = false;
