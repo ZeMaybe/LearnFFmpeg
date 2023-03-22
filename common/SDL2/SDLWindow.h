@@ -20,15 +20,15 @@ public:
     void setDestroyOnClose(bool destroy) { destroyOnClose = destroy; }
 
     bool createRenderer(Uint32 flags = SDL_RENDERER_ACCELERATED);
-    bool createTexture(Uint32 format,int access = SDL_TEXTUREACCESS_STREAMING);
-    bool createTexture(Uint32 format,int w,int h, int access = SDL_TEXTUREACCESS_STREAMING);
+    bool createTexture(Uint32 format, int access = SDL_TEXTUREACCESS_STREAMING);
+    bool createTexture(Uint32 format, int w, int h, int access = SDL_TEXTUREACCESS_STREAMING);
 
     void setRenderer(SDL_Renderer* r);
     void setTexture(SDL_Texture* t);
 
 protected:
     friend class SDLApp;
-    virtual void onTick();
+    virtual void onTick() {}
     virtual void onRender();
 
     virtual void onShown() {}

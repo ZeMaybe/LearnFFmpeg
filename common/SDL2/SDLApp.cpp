@@ -89,6 +89,14 @@ void SDLApp::render()
 void SDLApp::clean()
 {
     running = false;
+    auto it = wnds.begin();
+    while (it != wnds.end())
+    {
+        auto tmp = it->second;
+        wnds.erase(it++);
+        delete tmp;
+    }
+
     SDL_Quit();
 }
 
@@ -152,9 +160,9 @@ void SDLApp::dispatchDisplayEvent(const SDL_DisplayEvent& ev)
 
 void SDLApp::dispatchWindowEvent(const SDL_WindowEvent& ev)
 {
-    if (ev.windowID == 0)
+    if (SDL_GetWindowFromID(ev.windowID) == nullptr)
     {
-        SDL_Log("Widnow Event with an invalid windowID 0");
+        SDL_Log("Widnow Event with an invalid windowID!");
         return;
     }
 
@@ -181,7 +189,7 @@ void SDLApp::dispatchWindowEvent(const SDL_WindowEvent& ev)
 
 #if SDL_VERSION_ATLEAST(2,0,18)
     case SDL_WINDOWEVENT_ICCPROF_CHANGED: getWnd(ev.windowID)->onIccprofChanged();   break;
-    case SDL_WINDOWEVENT_DISPLAY_CHANGED: getWnd(ev.windowID)->onDisplayChanged(ev.data1);break;
+    case SDL_WINDOWEVENT_DISPLAY_CHANGED: getWnd(ev.windowID)->onDisplayChanged(ev.data1); break;
 #endif
     default: SDL_Log("Unhandled SDL_WINDOWEVENT for window : %d", ev.windowID);       break;
     }
@@ -189,7 +197,8 @@ void SDLApp::dispatchWindowEvent(const SDL_WindowEvent& ev)
 
 void SDLApp::dispatchKeyDownEvent(const SDL_KeyboardEvent& ev)
 {
-    if (onKeyDown(ev.keysym, ev.repeat) == false && ev.windowID != 0)
+    if (onKeyDown(ev.keysym, ev.repeat) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onKeyDown(ev.keysym, ev.repeat);
     }
@@ -197,7 +206,8 @@ void SDLApp::dispatchKeyDownEvent(const SDL_KeyboardEvent& ev)
 
 void SDLApp::dispatchKeyUpEvent(const SDL_KeyboardEvent& ev)
 {
-    if (onKeyUp(ev.keysym, ev.repeat) == false && ev.windowID != 0)
+    if (onKeyUp(ev.keysym, ev.repeat) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onKeyUp(ev.keysym, ev.repeat);
     }
@@ -205,7 +215,8 @@ void SDLApp::dispatchKeyUpEvent(const SDL_KeyboardEvent& ev)
 
 void SDLApp::dispatchTextEditingEvent(const SDL_TextEditingEvent& ev)
 {
-    if (onTextEditing(ev.text, ev.start, ev.length) == false && ev.windowID != 0)
+    if (onTextEditing(ev.text, ev.start, ev.length) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onTextEditing(ev.text, ev.start, ev.length);
     }
@@ -213,7 +224,8 @@ void SDLApp::dispatchTextEditingEvent(const SDL_TextEditingEvent& ev)
 
 void SDLApp::dispatchTextInputEvent(const SDL_TextInputEvent& ev)
 {
-    if (onTextInput(ev.text) == false && ev.windowID != 0)
+    if (onTextInput(ev.text) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onTextInput(ev.text);
     }
@@ -222,7 +234,8 @@ void SDLApp::dispatchTextInputEvent(const SDL_TextInputEvent& ev)
 //https://wiki.libsdl.org/SDL2/SDL_MouseMotionEvent
 void SDLApp::dispatchMouseMotionEvent(const SDL_MouseMotionEvent& ev)
 {
-    if (onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel) == false && ev.windowID != 0)
+    if (onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onMouseMove(ev.which, ev.state, ev.x, ev.y, ev.xrel, ev.yrel);
     }
@@ -230,7 +243,8 @@ void SDLApp::dispatchMouseMotionEvent(const SDL_MouseMotionEvent& ev)
 
 void SDLApp::dispatchMouseButtonDownEvent(const SDL_MouseButtonEvent& ev)
 {
-    if (onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false && ev.windowID != 0)
+    if (onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onMouseButtonDown(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
     }
@@ -238,7 +252,8 @@ void SDLApp::dispatchMouseButtonDownEvent(const SDL_MouseButtonEvent& ev)
 
 void SDLApp::dispatchMouseButtonUpEvent(const SDL_MouseButtonEvent& ev)
 {
-    if (onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false && ev.windowID != 0)
+    if (onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onMouseButtonUp(ev.which, ev.button, ev.state, ev.clicks, ev.x, ev.y);
     }
@@ -246,7 +261,8 @@ void SDLApp::dispatchMouseButtonUpEvent(const SDL_MouseButtonEvent& ev)
 
 void SDLApp::dispatchMouseWheelEvent(const SDL_MouseWheelEvent& ev)
 {
-    if (onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY) == false && ev.windowID != 0)
+    if (onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onMouseWheel(ev.which, ev.x, ev.y, ev.direction, ev.preciseX, ev.preciseY);
     }
@@ -254,7 +270,8 @@ void SDLApp::dispatchMouseWheelEvent(const SDL_MouseWheelEvent& ev)
 
 void SDLApp::dispatchUserEvent(const SDL_UserEvent& ev)
 {
-    if (onUserEvent(ev.code, ev.data1, ev.data2) == false && ev.windowID != 0)
+    if (onUserEvent(ev.code, ev.data1, ev.data2) == false &&
+        SDL_GetWindowFromID(ev.windowID) != nullptr)
     {
         getWnd(ev.windowID)->onUserEvent(ev.code, ev.data1, ev.data2);
     }
