@@ -13,7 +13,7 @@ SDLWindow::SDLWindow(SDL_Window* wnd)
     this->wndId = SDL_GetWindowID(wnd);
     SDL_assert(sdlApp->insertWindow(this));
     createRenderer();
-    createTexture(SDL_PIXELFORMAT_IYUV);
+    //createTexture(SDL_PIXELFORMAT_IYUV);
 }
 
 SDLWindow::SDLWindow(const char* title, int x, int y, int w, int h, Uint32 flags)
@@ -27,7 +27,7 @@ SDLWindow::SDLWindow(const char* title, int x, int y, int w, int h, Uint32 flags
     wndId = SDL_GetWindowID(wnd);
     SDL_assert(sdlApp->insertWindow(this));
     createRenderer();
-    createTexture(SDL_PIXELFORMAT_IYUV);
+    //createTexture(SDL_PIXELFORMAT_IYUV);
 }
 
 SDLWindow::~SDLWindow()

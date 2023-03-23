@@ -132,7 +132,7 @@ protected:
     SDL_Thread* subThread = nullptr;
     std::mutex buffMutex;
 
-    long long t = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    long long t = 0;
 };
 
 int main(int argc, char* argv[])

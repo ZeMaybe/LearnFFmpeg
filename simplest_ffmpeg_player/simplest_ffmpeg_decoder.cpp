@@ -135,9 +135,7 @@ int main(int argc, char* argv[])
     av_image_fill_arrays(pFrameYUV->data, pFrameYUV->linesize, out_buffer,
         AV_PIX_FMT_YUV420P, pCodecParams->width, pCodecParams->height, 1);
 
-
-
-    packet = (AVPacket*)av_malloc(sizeof(AVPacket));
+    packet = av_packet_alloc();
     //Output Info-----------------------------
     printf("--------------- File Information ----------------\n");
     av_dump_format(pFormatCtx, 0, filepath, 0);
@@ -187,7 +185,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    //av_free_packet(packet);
     av_packet_free(&packet);
     //flush decoder
     //FIX: Flush Frames remained in Codec
