@@ -1,12 +1,14 @@
 
 #include "FFmpegDecoder.h"
+#include "FFmpegHwDecoderHelper.h"
 
 extern "C"
 {
 #include "SDL.h"
 }
 
-FFmpegDecoder::FFmpegDecoder(const char* filePath)
+FFmpegDecoder::FFmpegDecoder(const char* filePath, int id)
+    :Id(id)
 {
     packet = av_packet_alloc();
     videoFrame1 = av_frame_alloc();
@@ -17,6 +19,9 @@ FFmpegDecoder::FFmpegDecoder(const char* filePath)
 
 FFmpegDecoder::~FFmpegDecoder()
 {
+    if(helper != nullptr)
+        delete helper;
+
     resetCodec();
     clearInternalData();
 }
@@ -39,7 +44,7 @@ bool FFmpegDecoder::loadFile(const char* filePath)
     resetInternalData();
 
     re = (formatCtx = avformat_alloc_context()) != nullptr;
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't allocate AVFormatContext.\n",void);
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't allocate AVFormatContext.\n", void);
 
     re = avformat_open_input(&formatCtx, filePath, nullptr, nullptr) == 0;
     check_false_log_return(re, AV_LOG_WARNING, "couldn't open input file.\n", resetCodec());
@@ -50,6 +55,11 @@ bool FFmpegDecoder::loadFile(const char* filePath)
     videoIndex = av_find_best_stream(formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &codec, 0);
     re = (videoIndex >= 0) && (codec != nullptr);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't find video stream.\n", resetCodec());
+    if (codec->id == AV_CODEC_ID_H264)
+    {
+        //codec = avcodec_find_decoder(AV_CODEC_ID_NUV);
+        //codec = avcodec_find_decoder_by_name("");
+    }
 
     codecCtx = avcodec_alloc_context3(codec);
     re = (codecCtx != nullptr);
@@ -57,6 +67,9 @@ bool FFmpegDecoder::loadFile(const char* filePath)
 
     re = (avcodec_parameters_to_context(codecCtx, formatCtx->streams[videoIndex]->codecpar) >= 0);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't copy parameters to codec context.\n", resetCodec());
+
+    helper = new FFmpegHwDecoderHelper(this);
+    helper->setupHwAcceleration("cuda");
 
     re = (avcodec_open2(codecCtx, codec, nullptr) == 0);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't open codec context.\n", resetCodec());
@@ -75,10 +88,11 @@ bool FFmpegDecoder::receiveVideoFrame(AVFrame* pFrame)
         if (frame2Ready)
         {
             {
-                std::lock_guard g(videoMutex);
+                std::lock_guard g(video2Mutex);
                 av_frame_move_ref(pFrame, videoFrame2);
                 frame2Ready = false;
                 re = true;
+                //SDL_Log("%d : take one.", Id);
             }
         }
     }
@@ -87,6 +101,7 @@ bool FFmpegDecoder::receiveVideoFrame(AVFrame* pFrame)
 
 void FFmpegDecoder::setOutputFramePixelFormat(AVPixelFormat newFmt)
 {
+    //av_hwframe_transfer_data()
     // need to be done.
     //outputFramePixelFormat = newFmt;
     // need to add swscontext or other thing to convert pixel format.. 
@@ -136,65 +151,6 @@ double FFmpegDecoder::getFrameRate() const
     return av_q2d(codecCtx->framerate);
 }
 
-void FFmpegDecoder::decoderFunction(FFmpegDecoder* d)
-{
-    if (d == nullptr)
-    {
-        return;
-    }
-
-    int ret;
-    do
-    {
-        if (d->frame1Ready == true && d->frame2Ready == false)
-        {
-            std::lock_guard g(d->videoMutex);
-            std::swap(d->videoFrame1, d->videoFrame2);
-            d->frame1Ready = false;
-            d->frame2Ready = true;
-        }
-
-        if (d->frame1Ready == false)
-        {
-            av_packet_unref(d->packet);
-            ret = av_read_frame(d->formatCtx, d->packet);
-            d->running = (ret == 0);
-            check_false_log_break(d->running, AV_LOG_WARNING, "failed to read a frame.\n");
-
-            if (d->packet->stream_index == d->videoIndex)
-            {
-                ret = avcodec_send_packet(d->codecCtx, d->packet);
-                d->running = (ret >= 0);
-                check_false_log_break(d->running, AV_LOG_WARNING, "failed to send packet.\n");
-
-                ret = avcodec_receive_frame(d->codecCtx, d->videoFrame1);
-                if (ret == AVERROR(EAGAIN))
-                {
-                    continue;
-                }
-
-                if (ret == AVERROR_EOF)
-                {
-                    d->running = false;
-                    // to be done:
-                    // should call avcodec_send_packet() with an empty packet 
-                    // to flush out last few frames in the buffer if any.
-                    break;
-                }
-
-                d->running = (ret >= 0);
-                check_false_log_break(d->running, AV_LOG_WARNING, "failed to recieve a new frame.\n");
-
-                d->frame1Ready = true;
-            }
-        }
-        else
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-    } while (d->running);
-}
-
 void FFmpegDecoder::resetCodec()
 {
     if (decoderThread.joinable())
@@ -233,7 +189,7 @@ void FFmpegDecoder::resetInternalData()
     av_frame_unref(videoFrame1);
     frame1Ready = false;
     {
-        std::lock_guard g(videoMutex);
+        std::lock_guard g(video2Mutex);
         av_frame_unref(videoFrame2);
         frame2Ready = false;
     }
@@ -245,4 +201,101 @@ void FFmpegDecoder::clearInternalData()
     av_packet_free(&packet);
     av_frame_free(&videoFrame1);
     av_frame_free(&videoFrame2);
+}
+
+void FFmpegDecoder::decoderFunction(FFmpegDecoder* d)
+{
+    if (d == nullptr) return;
+
+    SDL_Log("decoder %d function start.\n", d->Id);
+    int ret;
+    while (d->running)
+    {
+        if (d->frame1Ready == false)
+        {
+            av_packet_unref(d->packet);
+            ret = av_read_frame(d->formatCtx, d->packet);
+            if (ret < 0)
+            {
+                d->sendPacketAndReceiveFrame(nullptr);
+                d->running = false;
+                break;
+            }
+
+            if (d->packet->stream_index == d->videoIndex)
+            {
+                ret = d->sendPacketAndReceiveFrame(d->packet);
+                if (ret == -1)
+                {
+                    d->running = false;
+                    break;
+                }
+
+                if (ret == 0)
+                {
+                    d->sendPacketAndReceiveFrame(nullptr);
+                    d->running = false;
+                    break;
+                }
+            }
+        }
+    }
+    SDL_Log("decoder %d function stoped.\n", d->Id);
+}
+
+// return value : 0  -> end of file
+//                1  -> send packet again
+//               -1  -> error occured    
+int FFmpegDecoder::sendPacketAndReceiveFrame(AVPacket* packet)
+{
+    int ret = avcodec_send_packet(codecCtx, packet);
+    if (ret < 0)
+    {
+        av_log(nullptr, AV_LOG_WARNING, "Failed to send packet.\n");
+        return -1;
+    }
+
+    while (running)
+    {
+        if (frame1Ready == false)
+        {
+            ret = avcodec_receive_frame(codecCtx, videoFrame1);
+            if (ret == AVERROR(EAGAIN))
+            {
+                return 1;
+            }
+
+            if (ret == AVERROR_EOF)
+            {
+                return 0;
+            }
+
+            if (ret < 0)
+            {
+                av_log(nullptr, AV_LOG_WARNING, "Failed to receive frame.\n");
+                return -1;
+            }
+
+            frame1Ready = true;
+            //if (Id == 2)
+                //SDL_Log("%d : get one frame.", Id);
+        }
+
+        if (frame1Ready == true && frame2Ready == false)
+        {
+            std::lock_guard g(video2Mutex);
+            std::swap(videoFrame1, videoFrame2);
+            frame1Ready = false;
+            frame2Ready = true;
+            //if (Id == 2)
+                //SDL_Log("%d : you can take it.", Id);
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            //SDL_Log("please take it.");
+        }
+    }
+
+    return -1;
 }

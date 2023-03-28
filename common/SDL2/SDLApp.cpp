@@ -49,7 +49,8 @@ int SDLApp::exec()
         }
 
         tick();
-        render();
+        // no need to call this too often...
+        //render();
     }
     clean();
 

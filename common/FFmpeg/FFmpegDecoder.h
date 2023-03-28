@@ -9,10 +9,11 @@ extern "C"
 #include "libavcodec/avcodec.h"
 }
 
+class FFmpegHwDecoderHelper;
 class FFmpegDecoder
 {
 public:
-    FFmpegDecoder(const char* filePath = nullptr);
+    FFmpegDecoder(const char* filePath = nullptr,int id = 0);
     virtual ~FFmpegDecoder();
 
     bool loadFile(const char* filePath);
@@ -26,8 +27,6 @@ public:
     void getPixelSize(int* w, int* h)const;
     double getFrameRate()const;
 
-    // decoder thread.
-    static void decoderFunction(FFmpegDecoder* decoder);
 protected:
     AVFormatContext* formatCtx = nullptr;
     AVCodecContext* codecCtx = nullptr;
@@ -44,8 +43,18 @@ protected:
 
     std::atomic<bool> frame1Ready = false;
     std::atomic<bool> frame2Ready = false;
-    std::mutex videoMutex;
+    std::mutex video2Mutex;
 
     std::atomic<bool> running = false;
     std::thread decoderThread;
+
+    friend class FFmpegHwDecoderHelper;
+
+    int Id = 0;
+
+private :
+    static void decoderFunction(FFmpegDecoder* decoder);
+    int sendPacketAndReceiveFrame(AVPacket* packet);
+
+    FFmpegHwDecoderHelper* helper = nullptr;
 };

@@ -51,9 +51,10 @@ class SimpleWindow :public SDLWindow
 {
 public:
     SimpleWindow(const char* path, int w, int h)
-        :SDLWindow("simple window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE)
+        :SDLWindow("simple window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h,/* SDL_WINDOW_OPENGL |*/ SDL_WINDOW_RESIZABLE)
     {
-        createTexture(SDL_PIXELFORMAT_IYUV, pixelWidth, pixelHeight);
+        render = SDL_CreateRenderer(wnd, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        texture = SDL_CreateTexture(render, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, 1920, 1080);
 
         inputFile = fopen(path, "rb+");
         SDL_assert(inputFile != nullptr);
@@ -112,6 +113,7 @@ public:
             if (buffFlag == true)
             {
                 SDL_UpdateTexture(texture, nullptr, pixelBuff, pixelWidth);
+                //renderHelper->update();
                 t = sdlApp->getRunningTime();
                 buffFlag = false;
                 //SDL_Log("          t:%lld", t);
@@ -133,6 +135,9 @@ protected:
     std::mutex buffMutex;
 
     long long t = 0;
+
+    SDL_Renderer* render = nullptr;
+    SDL_Texture* texture = nullptr;
 };
 
 int main(int argc, char* argv[])

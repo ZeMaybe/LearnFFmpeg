@@ -19,13 +19,6 @@ public:
     bool getDestroyOnClose() const { return destroyOnClose; }
     void setDestroyOnClose(bool destroy) { destroyOnClose = destroy; }
 
-    bool createRenderer(Uint32 flags = SDL_RENDERER_ACCELERATED);
-    bool createTexture(Uint32 format, int access = SDL_TEXTUREACCESS_STREAMING);
-    bool createTexture(Uint32 format, int w, int h, int access = SDL_TEXTUREACCESS_STREAMING);
-
-    void setRenderer(SDL_Renderer* r);
-    void setTexture(SDL_Texture* t);
-
 protected:
     friend class SDLApp;
     virtual void onTick() {}
@@ -62,8 +55,9 @@ protected:
 protected:
     Uint32 wndId = 0;
     SDL_Window* wnd = nullptr;
-    SDL_Renderer* renderer = nullptr;
-    SDL_Texture* texture = nullptr;
+
+    class RenderHelper* renderHelper = nullptr;
 
     bool destroyOnClose = true;
+    long long t = 0;
 };
