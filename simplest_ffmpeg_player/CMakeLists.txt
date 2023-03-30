@@ -26,6 +26,32 @@ target_include_directories(simplest_video_play_sdl2 PRIVATE
 target_link_directories(simplest_video_play_sdl2 PRIVATE ${SDL2_LIBDIR})
 target_link_libraries(simplest_video_play_sdl2 PRIVATE sdl2.lib sdl2main.lib)
 
+add_executable(test_player test_player.cpp
+	${COMMON_SOURCE_FILES}
+	${COMMON_SDL_SOURCE_FILES} 
+	${COMMON_CONVERT_FILES}
+	${COMMON_FFMPEG_SOURCE_FILES} 
+	"${COMMON_FILE_DIR}/SDL2/RenderHelper/RenderHelper.h"
+	"${COMMON_FILE_DIR}/SDL2/RenderHelper/SDLRenderHelper.h"
+	"${COMMON_FILE_DIR}/SDL2/RenderHelper/SDLRenderHelper.cpp"
+)
+target_include_directories(test_player PRIVATE
+	${FFMPEG_INCLUDE_DIR} 
+	${SDL2_INCLUDE_DIR}
+	${COMMON_FILE_DIR}
+	"${COMMON_FILE_DIR}/SDL2"
+	"${COMMON_FILE_DIR}/SDL2/RenderHelper"
+	"${COMMON_FILE_DIR}/FFmpeg"
+)
+target_link_directories(test_player PRIVATE
+	${FFMPEG_LIB_DIR} 
+	${SDL2_LIBDIR}
+)
+target_link_libraries(test_player PRIVATE
+	avcodec.lib avutil.lib avformat.lib swscale.lib
+	sdl2.lib sdl2main.lib
+)
+
 enable_language(CUDA)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
