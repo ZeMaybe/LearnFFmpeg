@@ -121,18 +121,16 @@ static int decode_write(AVCodecContext* codecCtx, AVPacket* packet)
         else
             tmp_frame = frame;
 
-        size = av_image_get_buffer_size((AVPixelFormat)tmp_frame->format, tmp_frame->width,
-            tmp_frame->height, 1);
+        AVPixelFormat f = (AVPixelFormat)tmp_frame->format;
+
+        size = tmp_frame->linesize[0] * tmp_frame->height;
         buffer = (uint8_t*)av_malloc(size);
         if (!buffer) {
             fprintf(stderr, "Can not alloc buffer\n");
             ret = AVERROR(ENOMEM);
             goto fail;
         }
-        ret = av_image_copy_to_buffer(buffer, size,
-            (const uint8_t* const*)tmp_frame->data,
-            (const int*)tmp_frame->linesize, (AVPixelFormat)tmp_frame->format,
-            tmp_frame->width, tmp_frame->height, 1);
+        memcpy(buffer, tmp_frame->data[0], size);
         if (ret < 0) {
             fprintf(stderr, "Can not copy image to buffer\n");
             goto fail;
@@ -163,12 +161,7 @@ int main(int argc, char* argv[])
     enum AVHWDeviceType hwType;     // cuda
     int i;
 
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <device type> <input file> <output file>\n", argv[0]);
-        return -1;
-    }
-
-    hwType = av_hwdevice_find_type_by_name(argv[1]);
+    hwType = av_hwdevice_find_type_by_name("cuda");
     if (hwType == AV_HWDEVICE_TYPE_NONE) {
         fprintf(stderr, "Device type %s is not supported.\n", argv[1]);
         fprintf(stderr, "Available device types:");
@@ -184,7 +177,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if (avformat_open_input(&formatCtx, argv[2], NULL, NULL) != 0) {
+    if (avformat_open_input(&formatCtx, "bbb_sunflower_1080p_60fps_normal.mp4", NULL, NULL) != 0) {
         fprintf(stderr, "Cannot open input file '%s'\n", argv[2]);
         return -1;
     }
@@ -235,7 +228,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    output_file = fopen(argv[3], "w+b");
+    output_file = fopen("out.y", "w+b");
 
     while (ret >= 0) {
         if ((ret = av_read_frame(formatCtx, packet)) < 0)
