@@ -12,10 +12,6 @@ extern "C"
 #include "cuda_runtime.h"
 #include "cuda_gl_interop.h"
 
-void glClearError();
-void glCheckError();
-void glLogCall(const char* func, const char* file, int line);
-#define glCall(x) glClearError();x;glLogCall(#x,__FILE__,__LINE__);
 
 class OpenGLRenderHelper : public RenderHelper
 {

@@ -8,6 +8,7 @@ extern "C"
 #include "OpenGLRenderHelper.h"
 #include "SDLApp.h"
 #include "ColorSpace.h"
+#include "opengl_error.h"
 #include <chrono>
 //#include <nvjpeg.h>
 //#include <iostream>
@@ -15,40 +16,6 @@ extern "C"
 //#include <fstream>
 //#define STB_IMAGE_WRITE_IMPLEMENTATION
 //#include "stb_image_write.h"
-
-void glClearError()
-{
-#ifndef NDEBUG
-    while (glGetError() != GL_NO_ERROR);
-#endif 
-}
-
-void glCheckError()
-{
-#ifndef NDEBUG
-    GLenum error;
-    while (error = glGetError())
-    {
-        SDL_Log("OpenGL error : 0x%X\n", error);
-    }
-#endif // DEBUG
-}
-
-void glLogCall(const char* func, const char* file, int line)
-{
-#ifndef DEBUG
-    char driver[MAX_PATH] = { 0 };
-    char dir[MAX_PATH] = { 0 };
-    char name[MAX_PATH] = { 0 };
-    char ext[MAX_PATH] = { 0 };
-    _splitpath(file, driver, dir, name, ext);
-    GLenum error;
-    while (error = glGetError())
-    {
-        SDL_Log("OpenGL error : 0x%X : %s:%d.\n%s.\n", error, name, line, func);
-    }
-#endif 
-}
 
 OpenGLRenderHelper::OpenGLRenderHelper(SDL_Window* w)
     :RenderHelper(w)
