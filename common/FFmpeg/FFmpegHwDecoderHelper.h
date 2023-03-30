@@ -3,8 +3,6 @@
 
 extern "C"
 {
-//#include "libavutil/hwcontext.h"
-//#include "libavutil/pixfmt.h"
 #include "libavcodec/avcodec.h"
 }
 #include <set>

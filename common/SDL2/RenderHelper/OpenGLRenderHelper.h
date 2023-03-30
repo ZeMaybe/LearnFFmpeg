@@ -2,19 +2,20 @@
 #pragma once
 #include "RenderHelper.h"
 
-// use opengl
-
 extern "C"
 {
 #include "GL/glew.h"
 #include "GL/wglew.h"
 #include "SDL.h"
-//#include "SDL_opengl.h"
 }
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "cuda_gl_interop.h"
-//#include "driver_types.h"
+
+void glClearError();
+void glCheckError();
+void glLogCall(const char* func, const char* file, int line);
+#define glCall(x) glClearError();x;glLogCall(#x,__FILE__,__LINE__);
 
 class OpenGLRenderHelper : public RenderHelper
 {
@@ -30,9 +31,16 @@ protected:
 
     GLuint bufferObject = 0;
     GLuint textureObject = 0;
-    GLuint shaderObject = 0;
 
     void createRenderer();
-    void createTexture(int w,int h);
+    void createTexture(int w, int h);
     void clear();
+
+protected:
+    GLuint shaderProgram = 0;
+    GLuint vertexArrayObject = 0;
+    GLuint vertexBuffObject = 0;
+    GLuint indexBufferObject = 0;
+    void createShaderProgram();
+    void createObjects();
 };
