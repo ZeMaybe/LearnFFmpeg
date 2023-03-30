@@ -68,7 +68,6 @@ void SDLRenderHelper::createRenderer()
     SDL_RendererInfo info;
     SDL_GetRendererInfo(renderer, &info);
     SDL_Log("Current render info:%s\n", info.name);
-    SDL_HINT_RENDER_BATCHING;
 }
 
 void SDLRenderHelper::createTexture(SDL_PixelFormatEnum fmt, int w, int h, int access)

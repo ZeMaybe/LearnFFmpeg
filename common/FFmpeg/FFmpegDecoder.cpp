@@ -2,24 +2,20 @@
 #include "FFmpegDecoder.h"
 #include "FFmpegHwDecoderHelper.h"
 
-extern "C"
-{
-#include "SDL.h"
-}
-
-FFmpegDecoder::FFmpegDecoder(const char* filePath, int id)
+FFmpegDecoder::FFmpegDecoder(const char* filePath, int id, bool hwAcc)
     :Id(id)
+    , hwAccel(hwAcc)
 {
     packet = av_packet_alloc();
     videoFrame1 = av_frame_alloc();
     videoFrame2 = av_frame_alloc();
 
-    loadFile(filePath);
+    loadFile(filePath, hwAccel);
 }
 
 FFmpegDecoder::~FFmpegDecoder()
 {
-    if(helper != nullptr)
+    if (helper != nullptr)
         delete helper;
 
     resetCodec();
@@ -32,8 +28,9 @@ FFmpegDecoder::~FFmpegDecoder()
     return v;\
 }\
 
-bool FFmpegDecoder::loadFile(const char* filePath)
+bool FFmpegDecoder::loadFile(const char* filePath, bool hwAcc)
 {
+    hwAccel = hwAcc;
     if (filePath == nullptr)
     {
         return false;
@@ -55,11 +52,6 @@ bool FFmpegDecoder::loadFile(const char* filePath)
     videoIndex = av_find_best_stream(formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &codec, 0);
     re = (videoIndex >= 0) && (codec != nullptr);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't find video stream.\n", resetCodec());
-    if (codec->id == AV_CODEC_ID_H264)
-    {
-        //codec = avcodec_find_decoder(AV_CODEC_ID_NUV);
-        //codec = avcodec_find_decoder_by_name("");
-    }
 
     codecCtx = avcodec_alloc_context3(codec);
     re = (codecCtx != nullptr);
@@ -68,8 +60,11 @@ bool FFmpegDecoder::loadFile(const char* filePath)
     re = (avcodec_parameters_to_context(codecCtx, formatCtx->streams[videoIndex]->codecpar) >= 0);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't copy parameters to codec context.\n", resetCodec());
 
-    helper = new FFmpegHwDecoderHelper(this);
-    helper->setupHwAcceleration("cuda");
+    if (hwAccel)
+    {
+        helper = new FFmpegHwDecoderHelper(this);
+        helper->setupHwAcceleration("cuda");
+    }
 
     re = (avcodec_open2(codecCtx, codec, nullptr) == 0);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't open codec context.\n", resetCodec());
@@ -92,7 +87,7 @@ bool FFmpegDecoder::receiveVideoFrame(AVFrame* pFrame)
                 av_frame_move_ref(pFrame, videoFrame2);
                 frame2Ready = false;
                 re = true;
-                //SDL_Log("%d : take one.", Id);
+                //av_log(nullptr, AV_LOG_INFO, "take one!");
             }
         }
     }
@@ -207,7 +202,7 @@ void FFmpegDecoder::decoderFunction(FFmpegDecoder* d)
 {
     if (d == nullptr) return;
 
-    SDL_Log("decoder %d function start.\n", d->Id);
+    av_log(nullptr, AV_LOG_INFO, "decoder %d function start.\n", d->Id);
     int ret;
     while (d->running)
     {
@@ -240,7 +235,7 @@ void FFmpegDecoder::decoderFunction(FFmpegDecoder* d)
             }
         }
     }
-    SDL_Log("decoder %d function stoped.\n", d->Id);
+    av_log(nullptr, AV_LOG_INFO, "decoder %d function stoped.\n", d->Id);
 }
 
 // return value : 0  -> end of file
@@ -287,13 +282,10 @@ int FFmpegDecoder::sendPacketAndReceiveFrame(AVPacket* packet)
             std::swap(videoFrame1, videoFrame2);
             frame1Ready = false;
             frame2Ready = true;
-            //if (Id == 2)
-                //SDL_Log("%d : you can take it.", Id);
         }
         else
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            //SDL_Log("please take it.");
         }
     }
 

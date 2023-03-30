@@ -5,8 +5,6 @@ extern "C"
 {
 #include "libavcodec/avcodec.h"
 }
-#include <set>
-#include <mutex>
 
 class FFmpegDecoder;
 class FFmpegHwDecoderHelper

@@ -1,22 +1,22 @@
 
 #pragma once
 
-#include <mutex>
 
 extern "C"
 {
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
 }
+#include <mutex>
 
 class FFmpegHwDecoderHelper;
 class FFmpegDecoder
 {
 public:
-    FFmpegDecoder(const char* filePath = nullptr,int id = 0);
+    FFmpegDecoder(const char* filePath = nullptr,int id = 0,bool hwAccel = true);
     virtual ~FFmpegDecoder();
 
-    bool loadFile(const char* filePath);
+    bool loadFile(const char* filePath,bool hwAccel = true);
     bool receiveVideoFrame(AVFrame* pFrame);
 
     AVPixelFormat getOutputFramePixelFormat()const { return outputFramePixelFormat; }
@@ -51,6 +51,7 @@ protected:
     friend class FFmpegHwDecoderHelper;
 
     int Id = 0;
+    bool hwAccel = true;
 
 private :
     static void decoderFunction(FFmpegDecoder* decoder);
