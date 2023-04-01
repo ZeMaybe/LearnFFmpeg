@@ -42,6 +42,13 @@
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
       "inherits": "x64-debug",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "x64-MinSizeRel",
+      "displayName": "x64 MinSizeRel",
+      "description": "Target Windows (64-bit) with the Visual Studio development environment. (MinSizeRel)",
+      "inherits": "x64-debug",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "MinSizeRel"}
     }
   ]
 }

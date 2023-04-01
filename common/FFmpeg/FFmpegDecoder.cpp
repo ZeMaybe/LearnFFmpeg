@@ -2,24 +2,28 @@
 #include "FFmpegDecoder.h"
 #include "FFmpegHwDecoderHelper.h"
 
-FFmpegDecoder::FFmpegDecoder(const char* filePath, int id, bool hwAcc)
-    :Id(id)
-    , hwAccel(hwAcc)
+FFmpegDecoder::FFmpegDecoder()
 {
     packet = av_packet_alloc();
-    videoFrame1 = av_frame_alloc();
-    videoFrame2 = av_frame_alloc();
+}
 
-    loadFile(filePath, hwAccel);
+FFmpegDecoder::FFmpegDecoder(const char* filePath, bool pumpAudio, bool pumpVideo, bool hwAccel, const char* hwName)
+    :pumpAudio(pumpAudio)
+    , pumpVideo(pumpVideo)
+    , hwAccel(hwAccel)
+    , hwName(hwName)
+{
+    packet = av_packet_alloc();
+    loadFile(filePath, pumpAudio, pumpVideo, hwAccel, hwName);
 }
 
 FFmpegDecoder::~FFmpegDecoder()
 {
-    if (helper != nullptr)
-        delete helper;
-
-    resetCodec();
-    clearInternalData();
+    clear();
+    if (packet != nullptr)
+    {
+        av_packet_free(&packet);
+    }
 }
 
 #define check_false_log_return(v,l,t,f)  if(v == false){\
@@ -28,68 +32,158 @@ FFmpegDecoder::~FFmpegDecoder()
     return v;\
 }\
 
-bool FFmpegDecoder::loadFile(const char* filePath, bool hwAcc)
+void FFmpegDecoder::setPumpAudio(bool pumpAudio)
 {
-    hwAccel = hwAcc;
-    if (filePath == nullptr)
+    if (decoderThread.joinable())
     {
+        return;
+    }
+
+    this->pumpAudio = pumpAudio;
+}
+
+void FFmpegDecoder::setPumpVideo(bool pumpVideo)
+{
+    if (decoderThread.joinable())
+    {
+        return;
+    }
+
+    this->pumpVideo = pumpVideo;
+}
+
+void FFmpegDecoder::setHwAccel(bool hwAccel, const char* hwName)
+{
+    if (decoderThread.joinable())
+    {
+        return;
+    }
+
+    if (pumpVideo)
+    {
+        this->hwAccel = hwAccel;
+        this->hwName = hwName;
+    }
+}
+
+bool FFmpegDecoder::loadFile(const char* filePath, bool pumpAudio, bool pumpVideo, bool hwAccel, const char* hwName)
+{
+    if (filePath == nullptr)        return false;
+
+    clear();
+
+    this->pumpAudio = pumpAudio;
+    this->pumpVideo = pumpVideo;
+    this->pumpVideo ? this->hwAccel = hwAccel : this->hwAccel = false;
+    this->hwName = hwName;
+
+    if (this->pumpAudio == false && this->pumpVideo == false)
+    {
+        av_log(nullptr, AV_LOG_FATAL, "Are you sure you want pump nothing? Idiot...\n");
         return false;
     }
 
-    bool re = true;
-    resetCodec();
-    resetInternalData();
-
-    re = (formatCtx = avformat_alloc_context()) != nullptr;
+    bool re = (formatCtx = avformat_alloc_context()) != nullptr;
     check_false_log_return(re, AV_LOG_WARNING, "couldn't allocate AVFormatContext.\n", void);
 
     re = avformat_open_input(&formatCtx, filePath, nullptr, nullptr) == 0;
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't open input file.\n", resetCodec());
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't open input file.\n", resetInputFormat());
 
     re = avformat_find_stream_info(formatCtx, nullptr) >= 0;
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't find stream informations.\n", resetCodec());
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't find stream informations.\n", resetInputFormat());
 
-    videoIndex = av_find_best_stream(formatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &codec, 0);
-    re = (videoIndex >= 0) && (codec != nullptr);
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't find video stream.\n", resetCodec());
+    av_log(nullptr, AV_LOG_INFO, "nb_streams = %d.\n", formatCtx->nb_streams);
+    av_dump_format(formatCtx, 0, filePath, false);
+    av_log(nullptr, AV_LOG_INFO, "\n");
 
-    codecCtx = avcodec_alloc_context3(codec);
-    re = (codecCtx != nullptr);
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't allocate codec context.\n", resetCodec());
+    re = loadVideoCodec();
+    re = loadAudioCodec();
 
-    re = (avcodec_parameters_to_context(codecCtx, formatCtx->streams[videoIndex]->codecpar) >= 0);
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't copy parameters to codec context.\n", resetCodec());
-
-    if (hwAccel)
+    if (re == true && (pumpVideo == true || pumpAudio == true))
     {
-        helper = new FFmpegHwDecoderHelper(this);
-        helper->setupHwAcceleration("cuda");
+        running = true;
+        pauseDecoding = false;
+        decoderThread = std::thread(&FFmpegDecoder::run, this);
     }
-
-    re = (avcodec_open2(codecCtx, codec, nullptr) == 0);
-    check_false_log_return(re, AV_LOG_WARNING, "couldn't open codec context.\n", resetCodec());
-
-    running = true;
-    decoderThread = std::thread(FFmpegDecoder::decoderFunction, this);
+    else
+    {
+        av_log(nullptr, AV_LOG_FATAL, "something is wrong when try to load %s\n",filePath);
+    }
     return re;
 }
 
-bool FFmpegDecoder::receiveVideoFrame(AVFrame* pFrame)
+void FFmpegDecoder::pause()
 {
-    bool re = false;
-    if (pFrame != nullptr)
+    pauseDecoding = true;
+}
+
+void FFmpegDecoder::resume()
+{
+    pauseDecoding = false;
+}
+
+AVFrame* FFmpegDecoder::getFrame(std::mutex& mutex, std::atomic<bool>& fullFlag, int& maxSize, std::deque<AVFrame*>& queue)
+{
+    AVFrame* re = nullptr;
     {
-        av_frame_unref(pFrame);
-        if (frame2Ready)
+        std::lock_guard g(mutex);
+        if (queue.size() != 0)
         {
-            {
-                std::lock_guard g(video2Mutex);
-                av_frame_move_ref(pFrame, videoFrame2);
-                frame2Ready = false;
-                re = true;
-                //av_log(nullptr, AV_LOG_INFO, "take one!");
-            }
+            re = queue.front();
+            queue.pop_front();
         }
+        if (queue.size() >= maxSize)
+        {
+            fullFlag = true;
+        }
+        else
+        {
+            fullFlag = false;
+        }
+    }
+    return re;
+}
+
+AVFrame* FFmpegDecoder::getVideoFrame()
+{
+    AVFrame* re = nullptr;
+
+    if (pauseDecoding == false)
+    {
+        re = getFrame(videoMutex, videoFull, videoQueueSize, videoQueue);
+    }
+
+    return re;
+}
+
+AVFrame* FFmpegDecoder::getAudioFrame()
+{
+    AVFrame* re = nullptr;
+
+    if (pauseDecoding == false)
+    {
+        re = getFrame(audioMutex, audioFull, audioQueueSize, audioQueue);
+    }
+
+    return re;
+}
+
+AVFrame* FFmpegDecoder::getNextVideoFrame()
+{
+    AVFrame* re = nullptr;
+    if (pauseDecoding == true)
+    {
+        re = getFrame(videoMutex, videoFull, videoQueueSize, videoQueue);
+    }
+    return re;
+}
+
+AVFrame* FFmpegDecoder::getNextAudioFrame()
+{
+    AVFrame* re = nullptr;
+    if (pauseDecoding == true)
+    {
+        re = getFrame(audioMutex, audioFull, audioQueueSize, audioQueue);
     }
     return re;
 }
@@ -110,9 +204,9 @@ void FFmpegDecoder::setOutputFramePixelFormat(AVPixelFormat newFmt)
 int FFmpegDecoder::getPixelWidth() const
 {
     int re = 0;
-    if (codecCtx != nullptr)
+    if (videoCodecCtx != nullptr)
     {
-        codecCtx->width;
+        videoCodecCtx->width;
     }
     return re;
 }
@@ -120,9 +214,9 @@ int FFmpegDecoder::getPixelWidth() const
 int FFmpegDecoder::getPixelHeight() const
 {
     int re = 0;
-    if (codecCtx != nullptr)
+    if (videoCodecCtx != nullptr)
     {
-        re = codecCtx->height;
+        re = videoCodecCtx->height;
     }
     return re;
 }
@@ -134,160 +228,269 @@ void FFmpegDecoder::getPixelSize(int* w, int* h) const
         return;
     }
 
-    if (codecCtx != nullptr)
+    if (videoCodecCtx != nullptr)
     {
-        *w = codecCtx->width;
-        *h = codecCtx->height;
+        *w = videoCodecCtx->width;
+        *h = videoCodecCtx->height;
     }
 }
 
 double FFmpegDecoder::getFrameRate() const
 {
-    return av_q2d(codecCtx->framerate);
+    return av_q2d(videoCodecCtx->framerate);
 }
 
-void FFmpegDecoder::resetCodec()
+void FFmpegDecoder::resetInputFormat()
 {
-    if (decoderThread.joinable())
-    {
-        running = false;
-        decoderThread.join();
-    }
-
-    if (codecCtx)
-    {
-        avcodec_free_context(&codecCtx);
-    }
-
-    if (formatCtx)
+    stopDecoderThread();
+    if (formatCtx != nullptr)
     {
         avformat_close_input(&formatCtx);
         avformat_free_context(formatCtx);
     }
-
-    codec = nullptr;
-    codecCtx = nullptr;
     formatCtx = nullptr;
-    videoIndex = -1;
-    outputFramePixelFormat = AV_PIX_FMT_NONE;
 }
 
-void FFmpegDecoder::resetInternalData()
+bool FFmpegDecoder::loadCodec(const AVCodec*& codec, AVCodecContext*& ctx, int& index, AVMediaType t)
+{
+    bool re;
+    index = av_find_best_stream(formatCtx, t, -1, -1, &codec, 0);
+    re = (index >= 0) && (codec != nullptr);
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't find stream.\n", void());
+
+    ctx = avcodec_alloc_context3(codec);
+    re = (ctx != nullptr);
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't allocate codec context.\n", void());
+
+    re = (avcodec_parameters_to_context(ctx, formatCtx->streams[index]->codecpar) >= 0);
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't copy parameters to codec context.\n", void());
+
+    if (t == AVMEDIA_TYPE_VIDEO && hwAccel == true)
+    {
+        helper = new FFmpegHwDecoderHelper(this);
+        re = helper->setupHwAcceleration(hwName);
+        check_false_log_return(re, AV_LOG_WARNING, "couldn't setup hardware acceleration.\n", void());
+    }
+
+    re = (avcodec_open2(ctx, codec, nullptr) == 0);
+    check_false_log_return(re, AV_LOG_WARNING, "couldn't open codec context.\n", void());
+    return re;
+}
+
+void FFmpegDecoder::resetVideoCodec()
+{
+    stopDecoderThread();
+    if (videoCodecCtx != nullptr)
+    {
+        avcodec_free_context(&videoCodecCtx);
+    }
+
+    videoCodecCtx = nullptr;
+    videoCodec = nullptr;
+    videoIndex = -1;
+    outputFramePixelFormat = AV_PIX_FMT_NONE;
+
+    if (helper != nullptr)
+    {
+        delete helper;
+        helper = nullptr;
+    }
+}
+
+bool FFmpegDecoder::loadVideoCodec()
+{
+    if (pumpVideo == false)
+    {
+        videoFull = true;
+        return true;
+    }
+
+    bool re = loadCodec(videoCodec, videoCodecCtx, videoIndex, AVMEDIA_TYPE_VIDEO);
+    if (re == false)
+    {
+        pumpVideo = false;
+        videoFull = true;
+        resetVideoCodec();
+    }
+    return re;
+}
+
+void FFmpegDecoder::resetVideoData()
+{
+    stopDecoderThread();
+    {
+        std::lock_guard g(videoMutex);
+        while (videoQueue.empty() == false)
+        {
+            av_frame_free(&(videoQueue.front()));
+            videoQueue.pop_front();
+        }
+        videoFull = false;
+    }
+}
+
+void FFmpegDecoder::resetAudioCodec()
+{
+    stopDecoderThread();
+    if (audioCodecCtx != nullptr)
+    {
+        avcodec_free_context(&audioCodecCtx);
+    }
+
+    audioCodecCtx = nullptr;
+    audioCodec = nullptr;
+    audioIndex = -1;
+}
+
+bool FFmpegDecoder::loadAudioCodec()
+{
+    if (pumpAudio == false)
+    {
+        audioFull = true;
+        return true;
+    }
+
+    bool re = loadCodec(audioCodec, audioCodecCtx, audioIndex, AVMEDIA_TYPE_AUDIO);
+    if (re == false)
+    {
+        pumpAudio = false;
+        audioFull = true;
+        resetAudioCodec();
+    }
+    return re;
+}
+
+void FFmpegDecoder::resetAudioData()
+{
+    stopDecoderThread();
+
+    {
+        std::lock_guard g(audioMutex);
+        while (audioQueue.empty() == false)
+        {
+            av_frame_free(&(audioQueue.front()));
+            audioQueue.pop_front();
+        }
+        audioFull = false;
+    }
+}
+
+void FFmpegDecoder::stopDecoderThread()
 {
     if (decoderThread.joinable())
     {
         running = false;
         decoderThread.join();
     }
-
-    av_packet_unref(packet);
-    av_frame_unref(videoFrame1);
-    frame1Ready = false;
-    {
-        std::lock_guard g(video2Mutex);
-        av_frame_unref(videoFrame2);
-        frame2Ready = false;
-    }
 }
 
-void FFmpegDecoder::clearInternalData()
+void FFmpegDecoder::run()
 {
-    resetInternalData();
-    av_packet_free(&packet);
-    av_frame_free(&videoFrame1);
-    av_frame_free(&videoFrame2);
-}
-
-void FFmpegDecoder::decoderFunction(FFmpegDecoder* d)
-{
-    if (d == nullptr) return;
-
-    av_log(nullptr, AV_LOG_INFO, "decoder %d function start.\n", d->Id);
-    int ret;
-    while (d->running)
-    {
-        if (d->frame1Ready == false)
-        {
-            av_packet_unref(d->packet);
-            ret = av_read_frame(d->formatCtx, d->packet);
-            if (ret < 0)
-            {
-                d->sendPacketAndReceiveFrame(nullptr);
-                d->running = false;
-                break;
-            }
-
-            if (d->packet->stream_index == d->videoIndex)
-            {
-                ret = d->sendPacketAndReceiveFrame(d->packet);
-                if (ret == -1)
-                {
-                    d->running = false;
-                    break;
-                }
-
-                if (ret == 0)
-                {
-                    d->sendPacketAndReceiveFrame(nullptr);
-                    d->running = false;
-                    break;
-                }
-            }
-        }
-    }
-    av_log(nullptr, AV_LOG_INFO, "decoder %d function stoped.\n", d->Id);
-}
-
-// return value : 0  -> end of file
-//                1  -> send packet again
-//               -1  -> error occured    
-int FFmpegDecoder::sendPacketAndReceiveFrame(AVPacket* packet)
-{
-    int ret = avcodec_send_packet(codecCtx, packet);
-    if (ret < 0)
-    {
-        av_log(nullptr, AV_LOG_WARNING, "Failed to send packet.\n");
-        return -1;
-    }
-
+    av_log(nullptr, AV_LOG_INFO, "decoder thread :%d start running.\n", wndId);
+    bool re = true;
     while (running)
     {
-        if (frame1Ready == false)
+        if (re == false)
         {
-            ret = avcodec_receive_frame(codecCtx, videoFrame1);
-            if (ret == AVERROR(EAGAIN))
-            {
-                return 1;
-            }
-
-            if (ret == AVERROR_EOF)
-            {
-                return 0;
-            }
-
-            if (ret < 0)
-            {
-                av_log(nullptr, AV_LOG_WARNING, "Failed to receive frame.\n");
-                return -1;
-            }
-
-            frame1Ready = true;
-            //if (Id == 2)
-                //SDL_Log("%d : get one frame.", Id);
+            sendVideoPacket(nullptr);
+            sendAudioPacket(nullptr);
+            running = false;
+            continue;
         }
 
-        if (frame1Ready == true && frame2Ready == false)
+        if (videoFull == false || audioFull == false)
         {
-            std::lock_guard g(video2Mutex);
-            std::swap(videoFrame1, videoFrame2);
-            frame1Ready = false;
-            frame2Ready = true;
+            av_packet_unref(packet);
+            if (av_read_frame(formatCtx, packet) < 0)
+            {
+                sendVideoPacket(nullptr);
+                sendAudioPacket(nullptr);
+                running = false;
+                continue;
+            }
+
+            if (packet->stream_index == videoIndex)
+            {
+                re = sendVideoPacket(packet);
+            }
+            else if (packet->stream_index == audioIndex)
+            {
+                re = sendAudioPacket(packet);
+            }
         }
         else
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
+    av_log(nullptr, AV_LOG_INFO, "decoder thread :%d stop running.\n", wndId);
+}
 
-    return -1;
+bool FFmpegDecoder::sendPacket(AVPacket* p, AVCodecContext*& ctx, std::deque<AVFrame*>& queue, std::atomic<bool>& full, std::mutex& mutex, const int& maxSize)
+{
+    int ret = avcodec_send_packet(ctx, p);
+    if (ret < 0)
+    {
+        av_log(nullptr, AV_LOG_WARNING, "%d:Can't send packet.\n", wndId);
+        return false;
+    }
+
+    while (running)
+    {
+        AVFrame* tmp = av_frame_alloc();
+        ret = avcodec_receive_frame(ctx, tmp);
+        if (ret == AVERROR(EAGAIN))
+        {
+            return true;
+        }
+
+        if (ret == AVERROR_EOF)
+        {
+            return false;
+        }
+
+        if (ret < 0)
+        {
+            av_log(nullptr, AV_LOG_WARNING, "%d:Can't receive frame.\n", wndId);
+            return false;
+        }
+
+        {
+            std::lock_guard g(mutex);
+            queue.push_back(tmp);
+            if (queue.size() >= maxSize)
+            {
+                full = true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool FFmpegDecoder::sendVideoPacket(AVPacket* p)
+{
+    if (pumpVideo == false)
+    {
+        return true;
+    }
+    return sendPacket(p, videoCodecCtx, videoQueue, videoFull, videoMutex, videoQueueSize);
+}
+
+bool FFmpegDecoder::sendAudioPacket(AVPacket* p)
+{
+    if (pumpAudio == false)
+    {
+        return true;
+    }
+    return sendPacket(p, audioCodecCtx, audioQueue, audioFull, audioMutex, audioQueueSize);
+}
+
+void FFmpegDecoder::clear()
+{
+    resetVideoData();
+    resetVideoCodec();
+
+    resetAudioData();
+    resetAudioCodec();
 }

@@ -63,7 +63,7 @@ bool FFmpegHwDecoderHelper::setupHwAcceleration(const char* hwDeviceName)
 
     for (int i = 0, index = 0; ; ++i)
     {
-        auto config = avcodec_get_hw_config(master->codec, i);
+        auto config = avcodec_get_hw_config(master->videoCodec, i);
         if (config == nullptr) break;
 
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
@@ -74,9 +74,9 @@ bool FFmpegHwDecoderHelper::setupHwAcceleration(const char* hwDeviceName)
         }
     }
 
-    master->codecCtx->opaque = this;
-    master->codecCtx->get_format = getHwFmtCallback;
-    int ret = av_hwdevice_ctx_create(&(master->codecCtx->hw_device_ctx), hwType, nullptr, nullptr, 0);
+    master->videoCodecCtx->opaque = this;
+    master->videoCodecCtx->get_format = getHwFmtCallback;
+    int ret = av_hwdevice_ctx_create(&(master->videoCodecCtx->hw_device_ctx), hwType, nullptr, nullptr, 0);
     if (ret != 0)
     {
         char tmp[1024] = { 0 };
