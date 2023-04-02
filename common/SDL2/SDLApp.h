@@ -6,7 +6,7 @@ extern "C"
 #include "SDL.h"
 }
 
-#include <map>
+#include <vector>
 #include <chrono>
 
 #define sdlApp (SDLApp::get())
@@ -78,11 +78,12 @@ protected:
     static SDLApp* theApp;
 
     friend class SDLWindow;
-    std::map<Uint32, SDLWindow*> wnds;
+    std::vector<SDLWindow*> wnds;
+    
 
     SDLWindow* lastActiveWnd = nullptr;
     std::chrono::system_clock::time_point t = std::chrono::system_clock::now();
 protected:
-    bool insertWindow(SDLWindow* wnd);
+    void insertWindow(SDLWindow* wnd);
     void removeWindow(SDLWindow* wnd);
 };

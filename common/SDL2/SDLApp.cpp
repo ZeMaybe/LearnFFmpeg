@@ -30,6 +30,7 @@ SDLApp::SDLApp(Uint32 sdlFlags)
     {
         std::cout << "SDL2 init failed! exec() will does nothing!";
     }
+    wnds.reserve(32);
 }
 
 int SDLApp::exec()
@@ -72,7 +73,7 @@ void SDLApp::tick()
     auto it = wnds.begin();
     while (it != wnds.end())
     {
-        it->second->onTick();
+        (*it)->onTick();
         ++it;
     }
 }
@@ -82,7 +83,7 @@ void SDLApp::render()
     auto it = wnds.begin();
     while (it != wnds.end())
     {
-        it->second->onRender();
+        (*it)->onTick();
         ++it;
     }
 }
@@ -93,10 +94,10 @@ void SDLApp::clean()
     auto it = wnds.begin();
     while (it != wnds.end())
     {
-        auto tmp = it->second;
-        wnds.erase(it++);
-        delete tmp;
+        delete* it;
+        ++it;
     }
+    wnds.clear();
 
     SDL_Quit();
 }
@@ -291,38 +292,53 @@ SDLWindow* SDLApp::getWnd(Uint32 wndId)
         return lastActiveWnd;
     }
 
-    auto it = wnds.find(wndId);
-    if (it != wnds.end())
+    SDL_Window* wnd = SDL_GetWindowFromID(wndId);
+    lastActiveWnd = (SDLWindow*)SDL_GetWindowData(wnd, "user_class");
+
+    if (lastActiveWnd == nullptr)
     {
-        lastActiveWnd = it->second;
-    }
-    else
-    {
-        SDL_Window* tmpWnd = SDL_GetWindowFromID(wndId);
-        lastActiveWnd = new SDLWindow(tmpWnd);            // if tmpWnd is nullptr,application will stop.
+        lastActiveWnd = new SDLWindow(wnd);
     }
     return lastActiveWnd;
 }
 
-bool SDLApp::insertWindow(SDLWindow* wnd)
+void SDLApp::insertWindow(SDLWindow* wnd)
 {
-    bool re = false;
+    bool found = false;
     if (wnd != nullptr)
     {
-        auto it = wnds.find(wnd->getWndId());
-        if (it == wnds.end())
+        auto it = wnds.begin();
+        while (it != wnds.end())
         {
-            re = wnds.insert(std::pair{ wnd->getWndId(),wnd }).second;
+            if (wnd == *it)
+            {
+                SDL_Log("window %d is already in wnds.\n", wnd->getWndId());
+                found = true;
+                break;
+            }
+            ++it;
+        }
+        if (found == false)
+        {
+            wnds.push_back(wnd);
         }
     }
-    return re;
 }
 
 void SDLApp::removeWindow(SDLWindow* wnd)
 {
     if (wnd != nullptr)
     {
-        wnds.erase(wnd->getWndId());
+        auto it = wnds.begin();
+        while (it != wnds.end())
+        {
+            if (*it == wnd)
+            {
+                wnds.erase(it);
+                break;
+            }
+            ++it;
+        }
     }
 
     // if now window is alive,the appliction is going to quite.

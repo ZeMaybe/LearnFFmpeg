@@ -12,8 +12,8 @@ SDLWindow::SDLWindow(SDL_Window* wnd)
     }
     this->wnd = wnd;
     this->wndId = SDL_GetWindowID(wnd);
-    bool re = sdlApp->insertWindow(this);
-    SDL_assert(re);
+    SDL_SetWindowData(wnd, "user_class", this);
+    sdlApp->insertWindow(this);
 }
 
 SDLWindow::SDLWindow(const char* title, int x, int y, int w, int h, Uint32 flags)
@@ -32,8 +32,8 @@ SDLWindow::SDLWindow(const char* title, int x, int y, int w, int h, Uint32 flags
         SDL_assert(false);
     }
     wndId = SDL_GetWindowID(wnd);
-    bool re = sdlApp->insertWindow(this);
-    SDL_assert(re);
+    SDL_SetWindowData(wnd, "user_class", this);
+    sdlApp->insertWindow(this);
 }
 
 SDLWindow::~SDLWindow()
