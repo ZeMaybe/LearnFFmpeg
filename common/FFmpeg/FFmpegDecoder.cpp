@@ -107,9 +107,17 @@ bool FFmpegDecoder::loadFile(const char* filePath, bool pumpAudio, bool pumpVide
     }
     else
     {
-        av_log(nullptr, AV_LOG_FATAL, "something is wrong when try to load %s\n",filePath);
+        av_log(nullptr, AV_LOG_FATAL, "something is wrong when try to load %s\n", filePath);
     }
     return re;
+}
+
+void FFmpegDecoder::setAudioResample(bool enable, uint64_t outChannelLayout, AVSampleFormat outFormat, int outSampleRate)
+{
+    swrEnable = enable;
+    outputChanelLayout = outChannelLayout;
+    outputSampleFormat = outFormat;
+    outputSampleRate = outSampleRate;
 }
 
 void FFmpegDecoder::pause()
@@ -163,6 +171,12 @@ AVFrame* FFmpegDecoder::getAudioFrame()
     if (pauseDecoding == false)
     {
         re = getFrame(audioMutex, audioFull, audioQueueSize, audioQueue);
+        AVFrame* tmp = convertAudioFrame(re);
+        if (tmp != nullptr)
+        {
+            av_frame_free(&re);
+            re = tmp;
+        }
     }
 
     return re;
@@ -174,6 +188,12 @@ AVFrame* FFmpegDecoder::getNextVideoFrame()
     if (pauseDecoding == true)
     {
         re = getFrame(videoMutex, videoFull, videoQueueSize, videoQueue);
+        AVFrame* tmp = convertAudioFrame(re);
+        if (tmp != nullptr)
+        {
+            av_frame_free(&re);
+            re = tmp;
+        }
     }
     return re;
 }
@@ -237,7 +257,22 @@ void FFmpegDecoder::getPixelSize(int* w, int* h) const
 
 double FFmpegDecoder::getFrameRate() const
 {
-    return av_q2d(videoCodecCtx->framerate);
+    double re = 0.0f;
+    if (videoCodec != nullptr)
+    {
+        re = av_q2d(videoCodecCtx->framerate);
+    }
+    return re;
+}
+
+AVSampleFormat FFmpegDecoder::getAudioSampleFormat() const
+{
+    AVSampleFormat re = AV_SAMPLE_FMT_NONE;
+    if (audioCodecCtx != nullptr)
+    {
+        re = audioCodecCtx->sample_fmt;
+    }
+    return re;
 }
 
 void FFmpegDecoder::resetInputFormat()
@@ -357,6 +392,7 @@ bool FFmpegDecoder::loadAudioCodec()
         audioFull = true;
         resetAudioCodec();
     }
+    resetSwrCtx();
     return re;
 }
 
@@ -373,6 +409,82 @@ void FFmpegDecoder::resetAudioData()
         }
         audioFull = false;
     }
+}
+
+void FFmpegDecoder::resetSwrCtx()
+{
+    if (swrCtx != nullptr)
+    {
+        swr_free(&swrCtx);
+        outputChannelNums = 0;
+        inputChannelNums = 0;
+    }
+}
+
+bool FFmpegDecoder::loadSwrCtx()
+{
+    resetSwrCtx();
+
+    bool re = false;
+    if (pumpAudio && swrEnable)
+    {
+        AVChannelLayout outputLayout;
+        outputLayout.opaque = 0;
+        av_channel_layout_from_mask(&outputLayout, outputChanelLayout);
+        int ret = swr_alloc_set_opts2(&swrCtx, &outputLayout, outputSampleFormat, outputSampleRate, &(audioCodecCtx->ch_layout), audioCodecCtx->sample_fmt, audioCodecCtx->sample_rate, 0, nullptr);
+        if (ret < 0)
+        {
+            av_log(nullptr, AV_LOG_FATAL, "couldn't alloc SwrContext.\n");
+        }
+        ret = swr_init(swrCtx);
+        if (ret < 0)
+        {
+            av_log(nullptr, AV_LOG_FATAL, "couldn't init SwrContext.\n");
+        }
+
+        outputChannelNums = outputLayout.nb_channels;
+        inputChannelNums = audioCodecCtx->ch_layout.nb_channels;
+        re = true;
+    }
+    return re;
+}
+
+AVFrame* FFmpegDecoder::convertAudioFrame(AVFrame* frame)
+{
+    AVFrame* re = nullptr;
+    if (frame != nullptr && swrEnable)
+    {
+        if (swrCtx == nullptr)
+        {
+            loadSwrCtx();
+        }
+
+        if (swrCtx != nullptr)
+        {
+            re = av_frame_alloc();
+            av_channel_layout_from_mask(&(re->ch_layout), outputChanelLayout);
+            re->sample_rate = outputSampleRate;
+            re->format = outputSampleFormat;
+            //re->nb_samples = frame->nb_samples;
+            if (swr_convert_frame(swrCtx, re, frame) != 0)
+            {
+                av_log(nullptr, AV_LOG_FATAL, "couldn't convert audio frame.\n");
+                av_frame_free(&re);
+                re = nullptr;
+            }
+            else
+            {
+                re->time_base = frame->time_base;
+                //re->pts = frame->pts;
+            }
+
+            auto tmp = swr_get_delay(swrCtx, 1000);
+            tmp++;
+
+            frame->pts;
+        }
+    }
+    return re;
 }
 
 void FFmpegDecoder::stopDecoderThread()

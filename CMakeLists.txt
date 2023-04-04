@@ -33,6 +33,10 @@ file(GLOB COMMON_RENDERHELPER_SOURCE_FILES
 	"${COMMON_FILE_DIR}/SDL2/RenderHelper/*.h"
 	"${COMMON_FILE_DIR}/SDL2/RenderHelper/*.cpp"
 )
+file(GLOB COMMON_AUDIO_SOURCE_FILES
+	"${COMMON_FILE_DIR}/Audio/*.h"
+	"${COMMON_FILE_DIR}/Audio/*.cpp"
+)
 file(GLOB COMMON_FFMPEG_SOURCE_FILES
 	"${COMMON_FILE_DIR}/FFmpeg/*.h"
 	"${COMMON_FILE_DIR}/FFmpeg/*.cpp"
@@ -45,6 +49,7 @@ find_package(SDL2 REQUIRED)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 add_subdirectory(simplest_ffmpeg_player)
+add_subdirectory(player)
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 file(COPY_FILE "${FFMPEG_BIN_DIR}/avcodec-60.dll" "${CMAKE_CURRENT_BINARY_DIR}/bin/avcodec-60.dll" ONLY_IF_DIFFERENT)

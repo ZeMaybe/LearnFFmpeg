@@ -101,3 +101,36 @@ target_include_directories(hw_decode PRIVATE ${FFMPEG_INCLUDE_DIR})
 target_link_directories(hw_decode PRIVATE ${FFMPEG_LIB_DIR})
 target_link_libraries(hw_decode PRIVATE avcodec.lib avutil.lib avformat.lib) 
 
+add_executable(simplest_ffmpeg_audio_decoder simplest_ffmpeg_audio_decoder.cpp
+	${COMMON_SOURCE_FILES}
+	${COMMON_SDL_SOURCE_FILES} 
+	${COMMON_FFMPEG_SOURCE_FILES} 
+	${COMMON_AUDIO_SOURCE_FILES}
+)
+target_include_directories(simplest_ffmpeg_audio_decoder PRIVATE
+	${FFMPEG_INCLUDE_DIR} 
+	${SDL2_INCLUDE_DIR}
+	${COMMON_FILE_DIR}
+	"${COMMON_FILE_DIR}/SDL2"
+	"${COMMON_FILE_DIR}/FFmpeg"
+	"${COMMON_FILE_DIR}/Audio"
+)
+target_link_directories(simplest_ffmpeg_audio_decoder PRIVATE
+	${FFMPEG_LIB_DIR} 
+	${SDL2_LIBDIR}
+)
+target_link_libraries(simplest_ffmpeg_audio_decoder PRIVATE
+	avcodec.lib avutil.lib avformat.lib swscale.lib swresample.lib
+	sdl2.lib sdl2main.lib
+)
+
+add_executable(sdl_pcm_player sdl_pcm_player.cpp)
+target_include_directories(sdl_pcm_player PRIVATE
+	${SDL2_INCLUDE_DIR}
+)
+target_link_directories(sdl_pcm_player PRIVATE
+	${SDL2_LIBDIR}
+)
+target_link_libraries(sdl_pcm_player PRIVATE
+	sdl2.lib sdl2main.lib
+)

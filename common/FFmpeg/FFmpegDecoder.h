@@ -6,6 +6,7 @@ extern "C"
 {
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
+#include "libswresample/swresample.h"
 }
 #include <mutex>
 #include <deque>
@@ -32,6 +33,8 @@ public:
     const char* getHwAccelName()const { return hwName; }
     bool loadFile(const char* filePath, bool pumpAudio = false, bool pumpVideo = true,bool hwAccel = true,const char* hwName = "cuda");
 
+    void setAudioResample(bool enable = true, uint64_t outChannelLayout = AV_CH_LAYOUT_STEREO, AVSampleFormat outFormat = AV_SAMPLE_FMT_S16, int outSampleRate = 44100);
+
     void pause();
     void resume();
     AVFrame* getVideoFrame();
@@ -47,6 +50,9 @@ public:
     int getPixelHeight()const;
     void getPixelSize(int* w, int* h)const;
     double getFrameRate()const;
+
+    // audio
+    AVSampleFormat getAudioSampleFormat()const;
 
 protected:
     AVFormatContext* formatCtx = nullptr;
@@ -87,6 +93,18 @@ protected:
     std::mutex audioMutex;
     int audioQueueSize = 4;
     void resetAudioData();
+
+    bool swrEnable = true;
+    uint64_t outputChanelLayout = AV_CH_LAYOUT_STEREO;
+    AVSampleFormat outputSampleFormat = AV_SAMPLE_FMT_S16;
+    int outputSampleRate = 44100;
+
+    int outputChannelNums = 0;
+    int inputChannelNums = 0;
+    SwrContext* swrCtx = nullptr;
+    void resetSwrCtx();
+    bool loadSwrCtx();
+    AVFrame* convertAudioFrame(AVFrame* frame);
 
     // thread
     std::atomic<bool> running = false;
