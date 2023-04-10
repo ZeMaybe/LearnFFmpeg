@@ -92,6 +92,11 @@ bool FFmpegDecoder::loadFile(const char* filePath, bool pumpAudio, bool pumpVide
     re = avformat_find_stream_info(formatCtx, nullptr) >= 0;
     check_false_log_return(re, AV_LOG_WARNING, "couldn't find stream informations.\n", resetInputFormat());
 
+    for (int i = 0; i < formatCtx->nb_streams; ++i)
+    {
+        formatCtx->streams[i]->discard = AVDISCARD_ALL;
+    }
+
     av_log(nullptr, AV_LOG_INFO, "nb_streams = %d.\n", formatCtx->nb_streams);
     av_dump_format(formatCtx, 0, filePath, false);
     av_log(nullptr, AV_LOG_INFO, "\n");
@@ -152,23 +157,23 @@ AVFrame* FFmpegDecoder::getFrame(std::mutex& mutex, std::atomic<bool>& fullFlag,
     return re;
 }
 
-AVFrame* FFmpegDecoder::getVideoFrame()
+AVFrame* FFmpegDecoder::getVideoFrame(bool& running)
 {
     AVFrame* re = nullptr;
 
-    if (pauseDecoding == false)
+    if (pauseDecoding == false && pumpVideo)
     {
         re = getFrame(videoMutex, videoFull, videoQueueSize, videoQueue);
     }
-
+    running = this->running && pumpVideo;
     return re;
 }
 
-AVFrame* FFmpegDecoder::getAudioFrame()
+AVFrame* FFmpegDecoder::getAudioFrame(bool& running)
 {
     AVFrame* re = nullptr;
 
-    if (pauseDecoding == false)
+    if (pauseDecoding == false && pumpAudio)
     {
         re = getFrame(audioMutex, audioFull, audioQueueSize, audioQueue);
         AVFrame* tmp = convertAudioFrame(re);
@@ -178,14 +183,14 @@ AVFrame* FFmpegDecoder::getAudioFrame()
             re = tmp;
         }
     }
-
+    running = this->running && pumpAudio;
     return re;
 }
 
 AVFrame* FFmpegDecoder::getNextVideoFrame()
 {
     AVFrame* re = nullptr;
-    if (pauseDecoding == true)
+    if (pauseDecoding == true && pumpVideo)
     {
         re = getFrame(videoMutex, videoFull, videoQueueSize, videoQueue);
         AVFrame* tmp = convertAudioFrame(re);
@@ -201,7 +206,7 @@ AVFrame* FFmpegDecoder::getNextVideoFrame()
 AVFrame* FFmpegDecoder::getNextAudioFrame()
 {
     AVFrame* re = nullptr;
-    if (pauseDecoding == true)
+    if (pauseDecoding == true && pumpAudio)
     {
         re = getFrame(audioMutex, audioFull, audioQueueSize, audioQueue);
     }
@@ -292,6 +297,8 @@ bool FFmpegDecoder::loadCodec(const AVCodec*& codec, AVCodecContext*& ctx, int& 
     index = av_find_best_stream(formatCtx, t, -1, -1, &codec, 0);
     re = (index >= 0) && (codec != nullptr);
     check_false_log_return(re, AV_LOG_WARNING, "couldn't find stream.\n", void());
+
+    formatCtx->streams[index]->discard = AVDISCARD_DEFAULT;
 
     ctx = avcodec_alloc_context3(codec);
     re = (ctx != nullptr);
@@ -573,6 +580,7 @@ bool FFmpegDecoder::sendPacket(AVPacket* p, AVCodecContext*& ctx, std::deque<AVF
             if (queue.size() >= maxSize)
             {
                 full = true;
+                av_log(nullptr, AV_LOG_WARNING, "size = %d,max = %d.\n",queue.size(),maxSize);
             }
         }
     }

@@ -3,7 +3,9 @@
 #include "SDLApp.h"
 #include "SDLWindow.h"
 #include "FFmpegDecoder.h"
+#include "FFmpegHwDecoderHelper.h"
 #include "OpenGLRenderHelper.h"
+#include "SDLRenderHelper.h"
 #include "AudioHelper.h"
 
 extern "C"
@@ -14,17 +16,27 @@ extern "C"
 class TestWnd : public SDLWindow
 {
 public:
-    TestWnd(const char* wndTitle,const char* filePath,int w,int h)
-        :SDLWindow(wndTitle,SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,w,h,SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE)
+    TestWnd(const char* wndTitle, const char* filePath, int w, int h)
+        :SDLWindow(wndTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE)
     {
-        decoder = new FFmpegDecoder(filePath,true);
-        renderHelper = new OpenGLRenderHelper(wnd);
-        audioHelper = new AudioHelper(decoder);
+        if (FFmpegHwDecoderHelper::isHwAccelerationAvailable("cuda"))
+        {
+            decoder = new FFmpegDecoder(filePath, false);
+            renderHelper = new OpenGLRenderHelper(wnd);
+        }
+        else
+        {
+            decoder = new FFmpegDecoder(filePath, true, true, false);
+            renderHelper = new SDLRenderHelper(wnd);
+        }
 
-        decoder->setHwAccel(true, "cuda");
-        decoder->setAudioResample(true, av_get_default_channel_layout(audioHelper->getChannelNums()), audioHelper->getDeviceSampleFmt(), audioHelper->getDeviceSampleRate());
+        if (decoder->getPumpAudio() == true)
+        {
+            audioHelper = new AudioHelper(decoder);
+            decoder->setAudioResample(true, av_get_default_channel_layout(audioHelper->getChannelNums()), audioHelper->getDeviceSampleFmt(), audioHelper->getDeviceSampleRate());
+            audioHelper->start();
+        }
         t = sdlApp->getRunningTime();
-        audioHelper->start();
     }
 
     virtual ~TestWnd()
@@ -45,7 +57,8 @@ public:
         {
             t = sdlApp->getRunningTime();
 
-            auto tmp = decoder->getVideoFrame();
+            bool running;
+            auto tmp = decoder->getVideoFrame(running);
             if (tmp)
             {
                 renderHelper->update(tmp);
@@ -53,7 +66,6 @@ public:
             }
             onRender();
         }
-
     }
 
 protected:

@@ -13,8 +13,9 @@ public:
     FFmpegHwDecoderHelper(FFmpegDecoder* master);
     virtual ~FFmpegHwDecoderHelper();
 
-    int getAvaliableHwCount();
-    const char* getAvaliableHwName(int index);
+    static int getAvaliableHwCount();
+    static const char* getAvaliableHwName(int index);
+    static bool isHwAccelerationAvailable(const char* hwName);
 
     bool setupHwAcceleration();
     bool setupHwAcceleration(const char* hwName);

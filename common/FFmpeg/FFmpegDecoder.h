@@ -16,7 +16,7 @@ class FFmpegDecoder
 {
 public:
     FFmpegDecoder();
-    FFmpegDecoder(const char* filePath = nullptr, bool pumpAudio = false,bool pumpVideo = true,bool hwAccel = true,const char* hwName = "cuda");
+    FFmpegDecoder(const char* filePath = nullptr, bool pumpAudio = false, bool pumpVideo = true, bool hwAccel = true, const char* hwName = "cuda");
     virtual ~FFmpegDecoder();
 
     void setId(int id) { wndId = id; }
@@ -31,14 +31,14 @@ public:
     void setPumpVideo(bool pumpVideo);
     void setHwAccel(bool hwAccel, const char* hwName);
     const char* getHwAccelName()const { return hwName; }
-    bool loadFile(const char* filePath, bool pumpAudio = false, bool pumpVideo = true,bool hwAccel = true,const char* hwName = "cuda");
+    bool loadFile(const char* filePath, bool pumpAudio = false, bool pumpVideo = true, bool hwAccel = true, const char* hwName = "cuda");
 
     void setAudioResample(bool enable = true, uint64_t outChannelLayout = AV_CH_LAYOUT_STEREO, AVSampleFormat outFormat = AV_SAMPLE_FMT_S16, int outSampleRate = 44100);
 
     void pause();
     void resume();
-    AVFrame* getVideoFrame();
-    AVFrame* getAudioFrame();
+    AVFrame* getVideoFrame(bool& running);
+    AVFrame* getAudioFrame(bool& running);
     AVFrame* getNextVideoFrame();
     AVFrame* getNextAudioFrame();
 
@@ -77,7 +77,7 @@ protected:
     std::deque<AVFrame*> videoQueue;
     std::atomic<bool> videoFull = false;
     std::mutex videoMutex;
-    int videoQueueSize = 2;
+    int videoQueueSize = 3;
     void resetVideoData();
 
     // audio
@@ -91,7 +91,7 @@ protected:
     std::deque<AVFrame*> audioQueue;
     std::atomic<bool> audioFull = false;
     std::mutex audioMutex;
-    int audioQueueSize = 4;
+    int audioQueueSize = 9;
     void resetAudioData();
 
     bool swrEnable = true;
@@ -115,7 +115,7 @@ protected:
     bool sendPacket(AVPacket* p, AVCodecContext*& ctx, std::deque<AVFrame*>& queue, std::atomic<bool>& full, std::mutex& mutex, const int& maxSize);
     bool sendVideoPacket(AVPacket* p);
     bool sendAudioPacket(AVPacket* p);
-    AVFrame* getFrame(std::mutex& mutex,std::atomic<bool>& fullFlag,int& maxSize,std::deque<AVFrame*>& queue);
+    AVFrame* getFrame(std::mutex& mutex, std::atomic<bool>& fullFlag, int& maxSize, std::deque<AVFrame*>& queue);
 
     AVPacket* packet = nullptr;
 

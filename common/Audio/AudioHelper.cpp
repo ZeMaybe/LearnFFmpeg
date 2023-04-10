@@ -25,7 +25,7 @@ AudioHelper::AudioHelper(FFmpegDecoder* d)
 #else
         defaultDevSpec.format &= (~SDL_AUDIO_MASK_ENDIAN);
 #endif
-        defaultDevSpec.samples = 1024;
+        defaultDevSpec.samples = 512;
         defaultDevSpec.userdata = this;
         defaultDevSpec.callback = AudioHelper::audio_callback_func;
     }
@@ -129,11 +129,16 @@ void AudioHelper::pushAudioData(Uint8* stream, int len)
         {
             avaliableDataLen = 0;
             avaliableDataPos = 0;
-            frame = decoder->getAudioFrame();
+            bool running;
+            frame = decoder->getAudioFrame(running);
             if (frame != nullptr)
             {
                 avaliableDataLen = frame->nb_samples * frame->ch_layout.nb_channels * av_get_bytes_per_sample((AVSampleFormat)frame->format);
                 avaliableDataPos = 0;
+            }
+            if (running == false)
+            {
+                return;
             }
         }
 

@@ -46,6 +46,17 @@ const char* FFmpegHwDecoderHelper::getAvaliableHwName(int index)
     return re;
 }
 
+bool FFmpegHwDecoderHelper::isHwAccelerationAvailable(const char* hwName)
+{
+    bool re = false;
+    if (getAvaliableHwCount() != 0 && hwName != 0)
+    {
+        auto hwType = av_hwdevice_find_type_by_name(hwName);
+        re = (hwType != AV_HWDEVICE_TYPE_NONE);
+    }
+    return re;
+}
+
 bool FFmpegHwDecoderHelper::setupHwAcceleration()
 {
     bool re = false;
