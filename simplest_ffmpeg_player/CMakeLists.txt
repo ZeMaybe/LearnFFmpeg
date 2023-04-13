@@ -96,10 +96,12 @@ target_include_directories(simplest_ffmpeg_player_su PRIVATE ${FFMPEG_INCLUDE_DI
 target_link_directories(simplest_ffmpeg_player_su PRIVATE ${FFMPEG_LIB_DIR} ${SDL2_LIBDIR})
 target_link_libraries(simplest_ffmpeg_player_su PRIVATE avcodec.lib avutil.lib avformat.lib swscale.lib sdl2.lib sdl2main.lib)
 
+#[[
 add_executable(hw_decode hw_decode.cpp)
 target_include_directories(hw_decode PRIVATE ${FFMPEG_INCLUDE_DIR})
 target_link_directories(hw_decode PRIVATE ${FFMPEG_LIB_DIR})
 target_link_libraries(hw_decode PRIVATE avcodec.lib avutil.lib avformat.lib) 
+]]
 
 add_executable(simplest_ffmpeg_audio_decoder simplest_ffmpeg_audio_decoder.cpp
 	${COMMON_SOURCE_FILES}
